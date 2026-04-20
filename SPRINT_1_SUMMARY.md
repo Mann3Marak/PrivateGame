@@ -1,0 +1,1 @@
+I’m going to read `TASK.md` now and extract the exact requirements so we can implement everything end-to-end and produce `SUMMARY.md` at the end. After that I’ll scaffold files and build each requested piece in order.
