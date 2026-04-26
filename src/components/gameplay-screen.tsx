@@ -28,6 +28,11 @@ function buildReelItems(pool: string[], fallback: string): string[] {
   return [...values, ...values, ...values];
 }
 
+function resolveTimerSeconds(timerSeconds: number | null | undefined, timerUnit: 'seconds' | 'minutes' | null | undefined): number {
+  if (!timerSeconds) return 0;
+  return timerUnit === 'minutes' ? timerSeconds * 60 : timerSeconds;
+}
+
 function parseTimerSeconds(rawText: string | null | undefined): number {
   if (!rawText) {
     return DEFAULT_OVERLAY_TIMER_SECONDS;
@@ -280,6 +285,14 @@ export function GameplayScreen() {
   const [isRandomInstructionTimerRunning, setIsRandomInstructionTimerRunning] = useState(false);
   const [isRandomInstructionTimerFlashing, setIsRandomInstructionTimerFlashing] = useState(false);
   const [isRandomInstructionTimerFlashOn, setIsRandomInstructionTimerFlashOn] = useState(false);
+  const [showGameOverOverlay, setShowGameOverOverlay] = useState(false);
+  const [gameOverAction, setGameOverAction] = useState<string>('');
+  const [gameOverTimerSeconds, setGameOverTimerSeconds] = useState(0);
+  const [gameOverTimerUnit, setGameOverTimerUnit] = useState<'seconds' | 'minutes'>('seconds');
+  const [gameOverSecondsLeft, setGameOverSecondsLeft] = useState(0);
+  const [isGameOverTimerRunning, setIsGameOverTimerRunning] = useState(false);
+  const [isGameOverTimerFlashing, setIsGameOverTimerFlashing] = useState(false);
+  const [isGameOverTimerFlashOn, setIsGameOverTimerFlashOn] = useState(false);
   const spinsSinceRandomInstructionRef = useRef(999);
   const shownRoundIntrosRef = useRef<Set<number>>(new Set());
   const pendingActionOnlyAdvanceRef = useRef<Player | null>(null);
@@ -290,6 +303,8 @@ export function GameplayScreen() {
   const nopeFlashIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const randomInstructionTickIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const randomInstructionFlashIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const gameOverTickIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const gameOverFlashIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timerEndSoundRef = useRef<HTMLAudioElement | null>(null);
   const roundIntroSoundRef = useRef<HTMLAudioElement | null>(null);
   const randomActionSoundRef = useRef<HTMLAudioElement | null>(null);
@@ -324,6 +339,8 @@ export function GameplayScreen() {
   const isLastRound = game.session.currentRoundNumber === game.rounds[game.rounds.length - 1]?.roundNumber;
   const isActionsOnlyRound = currentRound.mode === 'actions-only';
   const roundCounter = game.session.turnCounters[String(currentRound.roundNumber)] ?? { P1: 0, P2: 0 };
+  const roundTotalLimit = currentRound.totalTurns > 0 ? currentRound.totalTurns : currentRound.quotaPerPlayer * 2;
+  const isGameComplete = isLastRound && (roundCounter.P1 + roundCounter.P2) >= roundTotalLimit;
   const sideVideoEmbedUrl = toYouTubeEmbedUrl(game.sideVideoUrl);
   const activeRoundIntroImageRef = activeRoundIntro?.introImageRef ?? null;
   const resultActionPlayer = getOpponent(game.session.activePlayer);
@@ -450,6 +467,12 @@ export function GameplayScreen() {
       if (randomInstructionFlashIntervalRef.current) {
         clearInterval(randomInstructionFlashIntervalRef.current);
       }
+      if (gameOverTickIntervalRef.current) {
+        clearInterval(gameOverTickIntervalRef.current);
+      }
+      if (gameOverFlashIntervalRef.current) {
+        clearInterval(gameOverFlashIntervalRef.current);
+      }
       reelStopTimeoutsRef.current.forEach((timeoutId) => clearTimeout(timeoutId));
       reelStopTimeoutsRef.current = [];
       if (timerEndSoundRef.current) {
@@ -551,7 +574,7 @@ export function GameplayScreen() {
       setIsRandomInstructionTimerFlashOn(false);
       // Step 1 uses the base action's own timer; Step 2 (if present) primes its own
       // timer when the player advances via onNextRandomInstructionStep.
-      setRandomInstructionSecondsLeft(pendingRandomInstruction.timerSeconds ?? 0);
+      setRandomInstructionSecondsLeft(resolveTimerSeconds(pendingRandomInstruction.timerSeconds, pendingRandomInstruction.timerUnit));
       setRandomInstructionImageFailed(false);
       setRandomInstructionStepImageFailed(false);
       setRandomInstructionStep(1);
@@ -566,12 +589,88 @@ export function GameplayScreen() {
     }
   };
 
-  const closeResultOverlay = (options?: { skipRandomInstruction?: boolean }) => {
+  const clearGameOverTimerIntervals = () => {
+    if (gameOverTickIntervalRef.current) {
+      clearInterval(gameOverTickIntervalRef.current);
+      gameOverTickIntervalRef.current = null;
+    }
+    if (gameOverFlashIntervalRef.current) {
+      clearInterval(gameOverFlashIntervalRef.current);
+      gameOverFlashIntervalRef.current = null;
+    }
+  };
+
+  const startGameOverTimerFlashAndFinish = () => {
+    clearGameOverTimerIntervals();
+    setIsGameOverTimerRunning(false);
+    setIsGameOverTimerFlashing(true);
+    setIsGameOverTimerFlashOn(true);
+
+    let togglesRemaining = TIMER_FLASH_TOGGLES;
+    gameOverFlashIntervalRef.current = setInterval(() => {
+      setIsGameOverTimerFlashOn((previous) => !previous);
+      togglesRemaining -= 1;
+      if (togglesRemaining <= 0) {
+        if (gameOverFlashIntervalRef.current) {
+          clearInterval(gameOverFlashIntervalRef.current);
+          gameOverFlashIntervalRef.current = null;
+        }
+        setIsGameOverTimerFlashing(false);
+        setIsGameOverTimerFlashOn(false);
+        void playGameAudio('timer');
+      }
+    }, TIMER_FLASH_INTERVAL_MS);
+  };
+
+  const startGameOverTimer = () => {
+    if (isGameOverTimerRunning || isGameOverTimerFlashing || !gameOverTimerSeconds) {
+      return;
+    }
+    clearGameOverTimerIntervals();
+    setGameOverSecondsLeft(gameOverTimerSeconds);
+    setIsGameOverTimerRunning(true);
+    gameOverTickIntervalRef.current = setInterval(() => {
+      setGameOverSecondsLeft((previous) => {
+        if (previous <= 1) {
+          startGameOverTimerFlashAndFinish();
+          return 0;
+        }
+        return previous - 1;
+      });
+    }, 1000);
+  };
+
+  const closeGameOverOverlay = () => {
+    clearGameOverTimerIntervals();
+    setIsGameOverTimerRunning(false);
+    setIsGameOverTimerFlashing(false);
+    setIsGameOverTimerFlashOn(false);
+    setShowGameOverOverlay(false);
+  };
+
+  const closeResultOverlay = (options?: { skipRandomInstruction?: boolean; skipGameOver?: boolean }) => {
     clearOverlayIntervals();
     setIsOverlayTimerRunning(false);
     setIsTimerFlashing(false);
     setIsTimerFlashOn(false);
     setShowResultOverlay(false);
+    if (!options?.skipGameOver && isGameComplete) {
+      const challenge = game.gameOverChallenge;
+      const actionText = challenge?.actionText?.trim() || 'One final act together...';
+      const timerSecs = challenge?.timerSeconds
+        ? resolveTimerSeconds(challenge.timerSeconds, challenge.timerUnit)
+        : DEFAULT_OVERLAY_TIMER_SECONDS;
+      setGameOverAction(actionText);
+      setGameOverTimerSeconds(timerSecs);
+      setGameOverTimerUnit(challenge?.timerUnit ?? 'seconds');
+      setGameOverSecondsLeft(timerSecs);
+      clearGameOverTimerIntervals();
+      setIsGameOverTimerRunning(false);
+      setIsGameOverTimerFlashing(false);
+      setIsGameOverTimerFlashOn(false);
+      setShowGameOverOverlay(true);
+      return;
+    }
     showNextQueuedOverlay(options);
   };
 
@@ -649,10 +748,11 @@ export function GameplayScreen() {
       return;
     }
     // Step 1 uses the base action's own timer; Step 2 uses its own timer.
-    const effectiveTimerSeconds =
+    const effectiveSource =
       randomInstructionStep === 2 && activeRandomInstruction.secondStep
-        ? activeRandomInstruction.secondStep.timerSeconds
-        : activeRandomInstruction.timerSeconds;
+        ? activeRandomInstruction.secondStep
+        : activeRandomInstruction;
+    const effectiveTimerSeconds = resolveTimerSeconds(effectiveSource.timerSeconds, effectiveSource.timerUnit);
     if (!effectiveTimerSeconds || isRandomInstructionTimerRunning || isRandomInstructionTimerFlashing) {
       return;
     }
@@ -679,7 +779,7 @@ export function GameplayScreen() {
     setIsRandomInstructionTimerRunning(false);
     setIsRandomInstructionTimerFlashing(false);
     setIsRandomInstructionTimerFlashOn(false);
-    setRandomInstructionSecondsLeft(activeRandomInstruction.secondStep.timerSeconds ?? 0);
+    setRandomInstructionSecondsLeft(resolveTimerSeconds(activeRandomInstruction.secondStep.timerSeconds, activeRandomInstruction.secondStep.timerUnit));
     setRandomInstructionStepImageFailed(false);
     setRandomInstructionStep(2);
   };
@@ -731,7 +831,7 @@ export function GameplayScreen() {
     setIsNopeTimerRunning(false);
     setIsNopeTimerFlashing(false);
     setIsNopeTimerFlashOn(false);
-    setNopeSecondsLeft(nopeAlternative.timerSeconds ?? 0);
+    setNopeSecondsLeft(resolveTimerSeconds(nopeAlternative.timerSeconds, nopeAlternative.timerUnit));
     setActiveNopeTask(nopeAlternative);
     setNopeTaskImageFailed(false);
     setShowNopeTaskOverlay(true);
@@ -820,8 +920,15 @@ export function GameplayScreen() {
     const outcome = spin(playerWhoSpins);
     if (outcome.ok) {
       setSpinningPlayer(playerWhoSpins);
+      const postSpinRoundNumber = useGameStore.getState().game.session.currentRoundNumber;
+      const roundAdvanced = postSpinRoundNumber !== preSpinRoundNumber;
       spinsSinceRandomInstructionRef.current += 1;
-      const canShowRandomInstruction = spinsSinceRandomInstructionRef.current > RANDOM_INSTRUCTION_MIN_SPINS_BETWEEN;
+      const preTurnCount =
+        (game.session.turnCounters[String(preSpinRoundNumber)]?.P1 ?? 0) +
+        (game.session.turnCounters[String(preSpinRoundNumber)]?.P2 ?? 0);
+      const isFirstSpinOfRound1 = preSpinRoundNumber === 1 && preTurnCount === 0;
+      const canShowRandomInstruction =
+        !roundAdvanced && !isFirstSpinOfRound1 && spinsSinceRandomInstructionRef.current > RANDOM_INSTRUCTION_MIN_SPINS_BETWEEN;
       const completedForRound =
         game.session.completedRandomInstructions?.[String(preSpinRoundNumber)] ?? [];
       const randomInstructionPick = canShowRandomInstruction
@@ -955,6 +1062,13 @@ export function GameplayScreen() {
     setPendingRandomInstruction(null);
     setPendingRandomInstructionIndex(null);
     setPendingRandomInstructionRoundNumber(null);
+    setShowGameOverOverlay(false);
+    clearGameOverTimerIntervals();
+    setIsGameOverTimerRunning(false);
+    setIsGameOverTimerFlashing(false);
+    setIsGameOverTimerFlashOn(false);
+    setGameOverSecondsLeft(0);
+    setGameOverTimerUnit('seconds');
     if (timerEndSoundRef.current) {
       timerEndSoundRef.current.pause();
       timerEndSoundRef.current.currentTime = 0;
@@ -967,7 +1081,7 @@ export function GameplayScreen() {
       randomActionSoundRef.current.pause();
       randomActionSoundRef.current.currentTime = 0;
     }
-    closeResultOverlay({ skipRandomInstruction: true });
+    closeResultOverlay({ skipRandomInstruction: true, skipGameOver: true });
     setIsSpinning(false);
     restartGame();
   };
@@ -1130,40 +1244,13 @@ export function GameplayScreen() {
                     showResultOverlay ||
                     showRandomInstructionOverlay ||
                     showRoundIntroOverlay ||
-                    showNopeTaskOverlay
+                    showNopeTaskOverlay ||
+                    showGameOverOverlay
                   }
                   onClick={onSpin}
                   type="button"
                 >
-                  {isSpinning ? (
-                    'Spinning...'
-                  ) : (
-                    <span className="flex flex-col items-center gap-3">
-                      {nextSpinnerImage && !nextSpinnerImageFailed ? (
-                        <span className={`relative overflow-hidden rounded-xl border border-[#f5e6d3]/60 bg-[#2f1530] ${PLAYER_IMAGE_FRAME_SIZE_CLASS}`}>
-                          <Image
-                            alt={`${nextSpinnerPlayer} next spinner image`}
-                            className="object-contain"
-                            fill
-                            onError={() => {
-                              if (nextSpinnerImage) {
-                                setFailedImageMap((previous) => ({ ...previous, [nextSpinnerImage]: true }));
-                              }
-                            }}
-                            sizes="176px"
-                            src={nextSpinnerImage}
-                          />
-                        </span>
-                      ) : (
-                        <span
-                          className={`flex items-center justify-center rounded-xl border border-[#f5e6d3]/50 bg-[#2f1530] text-xs text-[#f5e6d3] ${PLAYER_IMAGE_FRAME_SIZE_CLASS}`}
-                        >
-                          Set player image
-                        </span>
-                      )}
-                      <span>Next Spin</span>
-                    </span>
-                  )}
+                  {isSpinning ? 'Spinning...' : 'Spin'}
                 </button>
               </div>
             </>
@@ -1274,6 +1361,12 @@ export function GameplayScreen() {
                 Done
               </button>
             </div>
+            {currentRound.chickenOutText?.trim() ? (
+              <div className="mt-4 rounded-xl border border-[#d4af37]/40 bg-[#3a1a30]/60 px-4 py-3 text-center">
+                <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#d4af37]">Chicken Out</p>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-[#fadadd]/85">{currentRound.chickenOutText}</p>
+              </div>
+            ) : null}
             {game.resultInfoText?.trim() ? (
               <p className="mt-3 whitespace-pre-wrap text-center text-xs italic text-[#fadadd]/70">
                 {game.resultInfoText}
@@ -1554,6 +1647,58 @@ export function GameplayScreen() {
                 type="button"
               >
                 Got It
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+      {showGameOverOverlay ? (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-[#1a0a1a]/92 p-4"
+          role="presentation"
+        >
+          <section
+            className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-y-auto rounded-2xl border-2 border-[#d4af37] bg-gradient-to-b from-[#5e2a4d] to-[#3a1a30] p-6 text-center shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#d4af37]">Final Round Complete</p>
+            <h2 className="heading-elegant mt-2 text-4xl font-bold text-[#f5e6d3]">Game Over...or is it?</h2>
+            <p className="mt-2 text-sm text-[#fadadd]/80">The night isn&apos;t over just yet — one last challenge awaits.</p>
+            <div className="mt-6 rounded-xl border border-[#d4af37]/70 bg-[#5e2a4d]/60 p-5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#d4af37]">Your Final Act</p>
+              <p className="mt-4 whitespace-pre-wrap text-xl font-bold text-[#f5e6d3]">{gameOverAction}</p>
+            </div>
+            <article
+              className={`mt-5 rounded-xl border p-4 text-center transition-colors ${
+                isGameOverTimerFlashing && isGameOverTimerFlashOn
+                  ? 'border-[#f5e6d3] bg-[#f5e6d3] text-[#5e2a4d]'
+                  : 'border-[#d4af37]/70 bg-[#5e2a4d]/65 text-[#f5e6d3]'
+              }`}
+            >
+              <p className="text-sm font-semibold uppercase tracking-wider text-[#d4af37]">Countdown</p>
+              <p className="mt-3 text-5xl font-black tabular-nums">
+                {gameOverTimerUnit === 'minutes'
+                  ? `${(gameOverSecondsLeft / 60).toFixed(gameOverSecondsLeft % 60 === 0 ? 0 : 2)}m`
+                  : `${gameOverSecondsLeft}s`}
+              </p>
+              <div className="mt-4">
+                <button
+                  className="btn-luxe rounded px-5 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={isGameOverTimerRunning || isGameOverTimerFlashing}
+                  onClick={startGameOverTimer}
+                  type="button"
+                >
+                  {isGameOverTimerRunning ? 'Running...' : 'Start Timer'}
+                </button>
+              </div>
+            </article>
+            <div className="mt-6 flex justify-center">
+              <button
+                className="btn-luxe rounded px-8 py-2.5 text-sm font-semibold"
+                onClick={closeGameOverOverlay}
+                type="button"
+              >
+                The End
               </button>
             </div>
           </section>

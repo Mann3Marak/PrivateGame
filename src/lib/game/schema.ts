@@ -53,6 +53,12 @@ const randomActionSchema = z.object({
   nopeAlternative: nopeAlternativeSchema.nullable().default(null)
 });
 
+const gameOverChallengeSchema = z.object({
+  actionText: z.string().max(4000).default(''),
+  timerSeconds: z.number().int().min(1).max(60 * 60).nullable().default(null),
+  timerUnit: z.union([z.literal('seconds'), z.literal('minutes')]).default('seconds')
+});
+
 const audioSettingsSchema = z.object({
   muted: z.boolean().default(false),
   volume: z.number().min(0).max(1).default(0.7),
@@ -79,6 +85,7 @@ const roundSchema = z.object({
     .refine((value) => isHttpsImageUrl(value), 'Image URL must be HTTPS and point to a supported image extension.')
     .nullable()
     .default(null),
+  chickenOutText: z.string().max(280).default(''),
   randomActions: z.array(randomActionSchema).default([]),
   spinners: z.object({
     part: z.array(spinnerEntrySchema),
@@ -111,6 +118,7 @@ export const gameStateSchema = z.object({
     })
     .default({ P1: null, P2: null }),
   sideVideoUrl: z.string().url().nullable().default(null),
+  gameOverChallenge: gameOverChallengeSchema.default({ actionText: '', timerSeconds: null, timerUnit: 'seconds' }),
   rounds: z
     .array(roundSchema)
     .min(5)

@@ -11,8 +11,10 @@ import {
   setAudioMuted,
   setAudioTrackUrl,
   setAudioVolume,
+  setGameOverChallenge,
   setPlayerImage,
   setResultInfoText,
+  setRoundChickenOutText,
   setRoundRandomAction,
   setRoundIntro,
   setRulesText,
@@ -46,6 +48,7 @@ export interface GameStoreState {
   updateResultInfoText: (text: string) => boolean;
   markRandomInstructionDone: (roundNumber: number, actionIndex: number) => void;
   updateSideVideoUrl: (videoUrl: string | null) => boolean;
+  updateGameOverChallenge: (actionText: string, timerSeconds: number | null, timerUnit: 'seconds' | 'minutes') => boolean;
   updateAudioMuted: (muted: boolean) => boolean;
   updateAudioVolume: (volume: number) => boolean;
   updateAudioTrackUrl: (track: 'timerEndAudioRef' | 'roundIntroAudioRef' | 'randomActionAudioRef', url: string | null) => boolean;
@@ -64,6 +67,7 @@ export interface GameStoreState {
   ) => boolean;
   updateRoundName: (roundNumber: number, name: string) => boolean;
   updateRoundIntro: (roundNumber: number, introText: string, introImageRef: string | null) => boolean;
+  updateRoundChickenOutText: (roundNumber: number, text: string) => boolean;
   addRound: () => boolean;
   addSpinnerEntry: (roundNumber: number, spinnerType: SpinnerType, text: string, imageRef: string | null) => boolean;
   updateSpinnerEntry: (
@@ -311,6 +315,15 @@ export const useGameStore = create<GameStoreState>((set, get) => {
       commit(result.value, get().spinError, null);
       return true;
     },
+    updateGameOverChallenge: (actionText: string, timerSeconds: number | null, timerUnit: 'seconds' | 'minutes') => {
+      const result = setGameOverChallenge(get().game, actionText, timerSeconds, timerUnit);
+      if (!result.ok || !result.value) {
+        set({ dashboardError: result.error ?? 'Failed to update game over challenge.' });
+        return false;
+      }
+      commit(result.value, get().spinError, null);
+      return true;
+    },
     updateSideVideoUrl: (videoUrl: string | null) => {
       const result = setSideVideoUrl(get().game, videoUrl);
       if (!result.ok || !result.value) {
@@ -432,6 +445,16 @@ export const useGameStore = create<GameStoreState>((set, get) => {
       const result = setRoundIntro(get().game, roundNumber, introText, introImageRef);
       if (!result.ok || !result.value) {
         set({ dashboardError: result.error ?? 'Failed to update round intro.' });
+        return false;
+      }
+
+      commit(result.value, get().spinError, null);
+      return true;
+    },
+    updateRoundChickenOutText: (roundNumber: number, text: string) => {
+      const result = setRoundChickenOutText(get().game, roundNumber, text);
+      if (!result.ok || !result.value) {
+        set({ dashboardError: result.error ?? 'Failed to update chicken out text.' });
         return false;
       }
 

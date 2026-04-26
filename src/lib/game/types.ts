@@ -57,6 +57,12 @@ export interface AudioSettings {
   randomActionAudioRef: string | null;
 }
 
+export interface GameOverChallenge {
+  actionText: string;
+  timerSeconds: number | null;
+  timerUnit: 'seconds' | 'minutes';
+}
+
 export type PlayerImages = Record<Player, string | null>;
 
 export interface Round {
@@ -67,6 +73,7 @@ export interface Round {
   totalTurns: number;
   introText: string;
   introImageRef: string | null;
+  chickenOutText: string;
   randomActions: RandomAction[];
   spinners: {
     part: SpinnerEntry[];
@@ -97,6 +104,7 @@ export interface GameState {
   audioSettings: AudioSettings;
   playerImages: PlayerImages;
   sideVideoUrl: string | null;
+  gameOverChallenge: GameOverChallenge;
   rounds: Round[];
   session: SessionState;
 }

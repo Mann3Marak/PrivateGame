@@ -26,6 +26,7 @@ function createRound(roundNumber: number): GameState['rounds'][number] {
     totalTurns: totalTurnsForRound(roundNumber),
     introText: `Welcome to Round ${roundNumber}. Keep the energy high and enjoy the game.`,
     introImageRef: null,
+    chickenOutText: '',
     randomActions,
     spinners: {
       part: [...EMPTY_SPINNERS.part],
@@ -67,6 +68,11 @@ export function createDefaultGameState(): GameState {
       P2: null
     },
     sideVideoUrl: null,
+    gameOverChallenge: {
+      actionText: '',
+      timerSeconds: null,
+      timerUnit: 'seconds'
+    },
     rounds,
     session: {
       isPaused: false,

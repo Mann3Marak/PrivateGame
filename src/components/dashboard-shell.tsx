@@ -984,10 +984,12 @@ export function DashboardShell() {
   const hydrateFromCloud = useGameStore((state) => state.hydrateFromCloud);
   const updateRulesText = useGameStore((state) => state.updateRulesText);
   const updateResultInfoText = useGameStore((state) => state.updateResultInfoText);
+  const updateGameOverChallenge = useGameStore((state) => state.updateGameOverChallenge);
   const updateSideVideoUrl = useGameStore((state) => state.updateSideVideoUrl);
   const updateAudioMuted = useGameStore((state) => state.updateAudioMuted);
   const updateAudioVolume = useGameStore((state) => state.updateAudioVolume);
   const updateRoundName = useGameStore((state) => state.updateRoundName);
+  const updateRoundChickenOutText = useGameStore((state) => state.updateRoundChickenOutText);
   const addRound = useGameStore((state) => state.addRound);
   const addSpinnerEntry = useGameStore((state) => state.addSpinnerEntry);
 
@@ -1002,6 +1004,9 @@ export function DashboardShell() {
 
   const [rulesDraft, setRulesDraft] = useState(game.rulesText);
   const [resultInfoDraft, setResultInfoDraft] = useState(game.resultInfoText ?? '');
+  const [gameOverActionDraft, setGameOverActionDraft] = useState(game.gameOverChallenge?.actionText ?? '');
+  const [gameOverTimerDraft, setGameOverTimerDraft] = useState(String(game.gameOverChallenge?.timerSeconds ?? ''));
+  const [gameOverTimerUnit, setGameOverTimerUnit] = useState<'seconds' | 'minutes'>(game.gameOverChallenge?.timerUnit ?? 'seconds');
   const [sideVideoUrlDraft, setSideVideoUrlDraft] = useState(game.sideVideoUrl ?? '');
   const [selectedRoundNumber, setSelectedRoundNumber] = useState(game.session.currentRoundNumber);
   const [audioVolumeDraft, setAudioVolumeDraft] = useState(String(Math.round(game.audioSettings.volume * 100)));
@@ -1023,6 +1028,12 @@ export function DashboardShell() {
   useEffect(() => {
     setResultInfoDraft(game.resultInfoText ?? '');
   }, [game.resultInfoText]);
+
+  useEffect(() => {
+    setGameOverActionDraft(game.gameOverChallenge?.actionText ?? '');
+    setGameOverTimerDraft(String(game.gameOverChallenge?.timerSeconds ?? ''));
+    setGameOverTimerUnit(game.gameOverChallenge?.timerUnit ?? 'seconds');
+  }, [game.gameOverChallenge]);
 
   useEffect(() => {
     setSideVideoUrlDraft(game.sideVideoUrl ?? '');
@@ -1143,6 +1154,20 @@ export function DashboardShell() {
                       >
                         Mode: {round.mode === 'actions-only' ? 'Actions Only' : 'Spin'}
                       </span>
+                    </div>
+                    <div className="mt-3">
+                      <label className="block text-xs font-medium text-slate-600" htmlFor={`chicken-out-${round.roundNumber}`}>
+                        Chicken Out option (shown in spin result modal — leave blank to hide)
+                      </label>
+                      <input
+                        className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                        defaultValue={round.chickenOutText}
+                        id={`chicken-out-${round.roundNumber}`}
+                        maxLength={280}
+                        onBlur={(event) => updateRoundChickenOutText(round.roundNumber, event.target.value)}
+                        placeholder="e.g. Take a sip instead"
+                        type="text"
+                      />
                     </div>
                     <RoundIntroEditor round={round} />
                     <div className="mt-3 rounded border border-dashed p-3">
@@ -1401,6 +1426,63 @@ export function DashboardShell() {
                   <AudioTrackEditor label="Round Intro Sound" track="roundIntroAudioRef" value={game.audioSettings.roundIntroAudioRef} />
                   <AudioTrackEditor label="Random Action Sound" track="randomActionAudioRef" value={game.audioSettings.randomActionAudioRef} />
                 </ol>
+              </div>
+              <div className="mt-4 rounded border border-dashed p-3">
+                <h3 className="text-sm font-semibold">Game Over Challenge</h3>
+                <p className="mt-1 text-xs text-slate-600">
+                  Shown in the &quot;Game Over...or is it?&quot; modal after the final round. Leave action blank to show a fallback message.
+                </p>
+                <label className="mt-3 block text-sm">
+                  Final Action Text
+                  <textarea
+                    className="mt-1 min-h-20 w-full rounded border p-2 text-sm"
+                    maxLength={4000}
+                    onBlur={() => updateGameOverChallenge(gameOverActionDraft, gameOverTimerDraft ? Number(gameOverTimerDraft) : null, gameOverTimerUnit)}
+                    onChange={(event) => setGameOverActionDraft(event.target.value)}
+                    placeholder="e.g. One last kiss that lasts as long as the timer..."
+                    value={gameOverActionDraft}
+                  />
+                  <span className="mt-1 block text-right text-xs text-slate-500">{gameOverActionDraft.length}/4000</span>
+                </label>
+                <div className="mt-2 grid gap-2 md:grid-cols-[1fr_auto_auto] md:items-end">
+                  <label className="text-sm">
+                    Timer Duration (optional)
+                    <input
+                      className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                      min={1}
+                      onBlur={() => updateGameOverChallenge(gameOverActionDraft, gameOverTimerDraft ? Number(gameOverTimerDraft) : null, gameOverTimerUnit)}
+                      onChange={(event) => setGameOverTimerDraft(event.target.value)}
+                      placeholder="e.g. 30"
+                      type="number"
+                      value={gameOverTimerDraft}
+                    />
+                  </label>
+                  <label className="text-sm">
+                    Unit
+                    <select
+                      className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                      onChange={(event) => {
+                        const unit = event.target.value as 'seconds' | 'minutes';
+                        setGameOverTimerUnit(unit);
+                        updateGameOverChallenge(gameOverActionDraft, gameOverTimerDraft ? Number(gameOverTimerDraft) : null, unit);
+                      }}
+                      value={gameOverTimerUnit}
+                    >
+                      <option value="seconds">Seconds</option>
+                      <option value="minutes">Minutes</option>
+                    </select>
+                  </label>
+                  <button
+                    className="btn-luxe rounded px-3 py-2 text-sm font-semibold"
+                    onClick={() => updateGameOverChallenge(gameOverActionDraft, gameOverTimerDraft ? Number(gameOverTimerDraft) : null, gameOverTimerUnit)}
+                    type="button"
+                  >
+                    Save
+                  </button>
+                </div>
+                {gameOverTimerDraft && (Number(gameOverTimerDraft) <= 0 || !Number.isFinite(Number(gameOverTimerDraft))) ? (
+                  <p className="mt-1 text-xs text-amber-700">Timer must be a positive number.</p>
+                ) : null}
               </div>
               <div className="mt-4 rounded border border-dashed p-3">
                 <h3 className="text-sm font-semibold">Round-Based Random Actions</h3>

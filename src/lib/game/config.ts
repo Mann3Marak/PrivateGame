@@ -4,8 +4,10 @@ import { sanitizePlainText } from '../security/sanitize';
 import { isHttpsImageUrl, normalizeImageRef } from './validation';
 
 const rulesSchema = z.string().max(4000);
+const gameOverActionTextSchema = z.string().max(4000);
 const roundNameSchema = z.string().max(80);
 const roundIntroTextSchema = z.string().max(220);
+const chickenOutTextSchema = z.string().max(280);
 const spinnerEntryIdSchema = z.string().min(1);
 const spinnerEntryTextSchema = z.string().max(140);
 const randomActionIndexSchema = z.number().int().min(0);
@@ -372,6 +374,42 @@ export function setRoundRandomAction(game: GameState, roundNumber: number, index
   return { ok: true, value: cloned };
 }
 
+export function setGameOverChallenge(
+  game: GameState,
+  actionText: string,
+  timerSeconds: number | null,
+  timerUnit: 'seconds' | 'minutes'
+): MutationResult<GameState> {
+  const sanitized = sanitizePlainText(actionText ?? '', { allowNewLines: true, maxLength: 4000 });
+  const parsedText = gameOverActionTextSchema.safeParse(sanitized);
+  if (!parsedText.success) {
+    return { ok: false, error: 'Game over action text must be 4000 characters or fewer.' };
+  }
+
+  const timerUnitNormalized: 'seconds' | 'minutes' = timerUnit === 'minutes' ? 'minutes' : 'seconds';
+  let timerSecondsNormalized: number | null = null;
+  if (timerSeconds != null) {
+    if (!Number.isFinite(timerSeconds) || timerSeconds <= 0) {
+      return { ok: false, error: 'Timer must be a positive number.' };
+    }
+    const rounded = Math.floor(timerSeconds);
+    if (rounded > 60 * 60) {
+      return { ok: false, error: 'Timer cannot exceed 60 minutes.' };
+    }
+    timerSecondsNormalized = rounded;
+  }
+
+  const cloned = cloneGame(game);
+  cloned.gameOverChallenge = {
+    actionText: parsedText.data,
+    timerSeconds: timerSecondsNormalized,
+    timerUnit: timerUnitNormalized
+  };
+  touchUpdatedAt(cloned);
+
+  return { ok: true, value: cloned };
+}
+
 export function setResultInfoText(game: GameState, nextText: string): MutationResult<GameState> {
   const sanitized = sanitizePlainText(nextText ?? '', { allowNewLines: true, maxLength: 280 });
   const parsed = resultInfoTextSchema.safeParse(sanitized);
@@ -442,6 +480,25 @@ export function renameRound(game: GameState, roundNumber: number, nextName: stri
   return { ok: true, value: cloned };
 }
 
+export function setRoundChickenOutText(game: GameState, roundNumber: number, text: string): MutationResult<GameState> {
+  const roundIndex = findRoundIndex(game, roundNumber);
+  if (roundIndex < 0) {
+    return { ok: false, error: `Round ${roundNumber} does not exist.` };
+  }
+
+  const sanitized = sanitizePlainText(text ?? '', { allowNewLines: true, maxLength: 280 });
+  const parsed = chickenOutTextSchema.safeParse(sanitized);
+  if (!parsed.success) {
+    return { ok: false, error: 'Chicken out text must be 280 characters or fewer.' };
+  }
+
+  const cloned = cloneGame(game);
+  cloned.rounds[roundIndex].chickenOutText = parsed.data;
+  touchUpdatedAt(cloned);
+
+  return { ok: true, value: cloned };
+}
+
 export function setRoundIntro(game: GameState, roundNumber: number, introText: string, introImageUrl: string | null): MutationResult<GameState> {
   const roundIndex = findRoundIndex(game, roundNumber);
   if (roundIndex < 0) {
@@ -492,6 +549,7 @@ export function addRound(game: GameState): MutationResult<GameState> {
     totalTurns: totalTurnsForRound(nextRoundNumber),
     introText: `Welcome to Round ${nextRoundNumber}. Keep the energy high and enjoy the game.`,
     introImageRef: null,
+    chickenOutText: '',
     randomActions: Array.from({ length: randomActionCountForRound(nextRoundNumber) }, (_, actionIndex) => ({
       text: `Round ${nextRoundNumber} random action ${actionIndex + 1}`,
       imageRef: null,
