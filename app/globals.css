@@ -2,13 +2,20 @@
 @import "tailwindcss";
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
   --rose-crimson: #b73d4a;
   --pink-blush: #fadadd;
   --beige-warm: #f5e6d3;
   --plum-deep: #5e2a4d;
   --gold-accent: #d4af37;
   --rose-gold: #c98f7b;
+  --ink: #120b17;
+  --ink-soft: #1d1024;
+  --panel: rgba(35, 20, 43, 0.78);
+  --panel-strong: rgba(24, 13, 31, 0.9);
+  --line: rgba(245, 230, 211, 0.18);
+  --text: #fff7ef;
+  --muted: #d9c4c8;
 }
 
 @keyframes gradientFlow {
@@ -80,9 +87,12 @@ body {
   min-height: 100vh;
   position: relative;
   isolation: isolate;
-  background: linear-gradient(180deg, #fadadd 0%, #f5e6d3 50%, #5e2a4d 100%);
+  background:
+    radial-gradient(circle at 20% 8%, rgba(183, 61, 74, 0.22), transparent 32%),
+    radial-gradient(circle at 86% 16%, rgba(212, 175, 55, 0.14), transparent 30%),
+    linear-gradient(145deg, #0d0811 0%, #1a0e22 42%, #32162b 100%);
   background-size: 100% 100%;
-  color: #122027;
+  color: var(--text);
 }
 
 body::before {
@@ -92,12 +102,10 @@ body::before {
   pointer-events: none;
   z-index: -2;
   background:
-    radial-gradient(circle at 6% 10%, rgba(212, 175, 55, 0.36), transparent 26%),
-    radial-gradient(circle at 92% 10%, rgba(201, 143, 123, 0.3), transparent 24%),
-    radial-gradient(circle at 15% 92%, rgba(212, 175, 55, 0.2), transparent 26%),
-    radial-gradient(circle at 92% 88%, rgba(250, 218, 221, 0.24), transparent 28%);
-  filter: blur(2px);
-  animation: candleFlicker 5.5s ease-in-out infinite alternate, blurSequence 1s ease 0.5s 1;
+    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.65), transparent 82%);
 }
 
 body::after {
@@ -106,46 +114,43 @@ body::after {
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  opacity: 0.18;
+  opacity: 0.62;
   background:
-    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.12), transparent 45%),
-    radial-gradient(circle at 80% 75%, rgba(94, 42, 77, 0.16), transparent 55%),
-    repeating-linear-gradient(35deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 6px);
+    radial-gradient(circle at 50% 0%, rgba(245, 230, 211, 0.08), transparent 34%),
+    linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.35) 100%);
   mix-blend-mode: soft-light;
 }
 
 .glass-panel {
-  background: rgba(250, 218, 221, 0.22);
-  border: 1px solid rgba(245, 230, 211, 0.4);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 14px 34px rgba(94, 42, 77, 0.24);
-  animation: edgePulse 7s ease-in-out infinite;
+  background: linear-gradient(180deg, rgba(50, 29, 58, 0.82), rgba(22, 13, 29, 0.86));
+  border: 1px solid var(--line);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
 }
 
 .glass-card {
-  background: rgba(245, 230, 211, 0.24);
-  border: 1px solid rgba(250, 218, 221, 0.45);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 10px 24px rgba(94, 42, 77, 0.2);
-  animation: edgePulse 8.5s ease-in-out infinite;
+  background: linear-gradient(180deg, rgba(42, 25, 51, 0.74), rgba(18, 11, 23, 0.82));
+  border: 1px solid var(--line);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 20px 54px rgba(0, 0, 0, 0.28);
 }
 
 .heading-elegant {
-  font-family: "Caveat", cursive;
-  color: var(--plum-deep);
-  letter-spacing: 0.4px;
+  font-family: "Quicksand", ui-sans-serif, system-ui, sans-serif;
+  color: var(--text);
+  letter-spacing: 0;
 }
 
 .btn-luxe {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, var(--gold-accent), var(--rose-gold));
-  color: #3f1b35;
-  border: 1px solid rgba(245, 230, 211, 0.75);
-  box-shadow: 0 12px 22px rgba(94, 42, 77, 0.3);
+  background: linear-gradient(135deg, #f0ca61, #c98f7b);
+  color: #221222;
+  border: 1px solid rgba(245, 230, 211, 0.62);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.34), 0 0 24px rgba(212, 175, 55, 0.18);
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.28);
 }
 
@@ -158,15 +163,256 @@ body::after {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(245, 230, 211, 0.42);
-  color: var(--plum-deep);
-  border: 1px solid rgba(245, 230, 211, 0.72);
-  box-shadow: 0 8px 14px rgba(94, 42, 77, 0.2);
+  background: rgba(245, 230, 211, 0.08);
+  color: var(--text);
+  border: 1px solid rgba(245, 230, 211, 0.24);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.2);
 }
 
 .btn-luxe-outline:hover {
-  background: rgba(245, 230, 211, 0.26);
+  background: rgba(245, 230, 211, 0.14);
   transform: translateY(-1px);
+}
+
+.game-app-shell {
+  min-height: calc(100vh - 3rem);
+}
+
+.game-topbar {
+  background: linear-gradient(180deg, rgba(12, 7, 18, 0.92), rgba(5, 3, 10, 0.9));
+  border: 1px solid rgba(245, 230, 211, 0.12);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.42), inset 0 -1px 0 rgba(212, 175, 55, 0.18);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.brand-orb {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 38% 30%, rgba(255, 255, 255, 0.85), transparent 12%),
+    radial-gradient(circle at 60% 68%, rgba(212, 175, 55, 0.9), transparent 18%),
+    linear-gradient(145deg, #341042, #0d0711 62%);
+  border: 1px solid rgba(245, 230, 211, 0.28);
+  box-shadow: 0 0 26px rgba(212, 175, 55, 0.2);
+}
+
+.game-stage {
+  background:
+    radial-gradient(ellipse at 50% 108%, rgba(212, 175, 55, 0.2), transparent 36%),
+    radial-gradient(circle at 50% 25%, rgba(138, 55, 114, 0.2), transparent 34%),
+    linear-gradient(180deg, rgba(35, 16, 43, 0.92), rgba(7, 4, 12, 0.96));
+  border: 1px solid rgba(245, 230, 211, 0.16);
+  box-shadow: 0 28px 76px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.game-machine {
+  position: relative;
+  overflow: hidden;
+  min-height: 580px;
+  background:
+    radial-gradient(ellipse at 50% 79%, rgba(245, 190, 78, 0.18), transparent 28%),
+    radial-gradient(ellipse at 50% 38%, rgba(212, 175, 55, 0.14), transparent 36%),
+    linear-gradient(180deg, rgba(16, 7, 22, 0.24), rgba(5, 3, 9, 0.74));
+  border: 1px solid rgba(245, 230, 211, 0.08);
+}
+
+.game-machine::before {
+  content: "";
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 18%;
+  height: 42%;
+  pointer-events: none;
+  border-top: 2px solid rgba(212, 175, 55, 0.15);
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+  opacity: 0.9;
+}
+
+.game-machine::after {
+  content: "";
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  bottom: 5%;
+  height: 118px;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 9% 78%, rgba(245, 205, 112, 0.9) 0 2px, transparent 3px),
+    radial-gradient(circle at 24% 84%, rgba(245, 205, 112, 0.9) 0 2px, transparent 3px),
+    radial-gradient(circle at 42% 88%, rgba(245, 205, 112, 0.9) 0 2px, transparent 3px),
+    radial-gradient(circle at 58% 88%, rgba(245, 205, 112, 0.9) 0 2px, transparent 3px),
+    radial-gradient(circle at 76% 84%, rgba(245, 205, 112, 0.9) 0 2px, transparent 3px),
+    radial-gradient(circle at 91% 78%, rgba(245, 205, 112, 0.9) 0 2px, transparent 3px),
+    radial-gradient(ellipse at 50% 42%, rgba(245, 205, 112, 0.2), transparent 48%);
+  border-bottom: 2px solid rgba(212, 175, 55, 0.24);
+  border-radius: 50%;
+}
+
+.player-spotlight {
+  background:
+    radial-gradient(circle at 50% 18%, rgba(212, 175, 55, 0.2), transparent 42%),
+    linear-gradient(180deg, rgba(70, 24, 63, 0.9), rgba(18, 8, 24, 0.94));
+  border: 2px solid rgba(212, 175, 55, 0.8);
+  box-shadow: 0 0 30px rgba(212, 175, 55, 0.16);
+}
+
+.spin-dock {
+  background: linear-gradient(180deg, rgba(245, 230, 211, 0.2), rgba(56, 24, 31, 0.52));
+  border: 1px solid rgba(245, 230, 211, 0.26);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.48), 0 0 24px rgba(212, 175, 55, 0.16);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.modal-action-button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 7rem !important;
+  border-radius: 999px !important;
+  padding: 0.65rem 1.45rem !important;
+  font-size: 0.875rem !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  letter-spacing: 0 !important;
+  color: #221222 !important;
+  background: linear-gradient(135deg, #f0ca61, #c98f7b) !important;
+  border: 1px solid rgba(245, 230, 211, 0.62) !important;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.34), 0 0 24px rgba(212, 175, 55, 0.18) !important;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.28) !important;
+}
+
+.modal-action-button--sm {
+  min-width: 6.25rem !important;
+  padding: 0.55rem 1.15rem !important;
+  font-size: 0.75rem !important;
+}
+
+.modal-action-button--secondary {
+  color: #fff7ef !important;
+  background: rgba(245, 230, 211, 0.08) !important;
+  border: 1px solid rgba(245, 230, 211, 0.24) !important;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.2) !important;
+}
+
+.machine-reel-card {
+  background:
+    linear-gradient(180deg, rgba(36, 17, 34, 0.98), rgba(8, 5, 12, 0.98)),
+    radial-gradient(circle at 50% 0%, rgba(212, 175, 55, 0.16), transparent 45%);
+  border: 1px solid rgba(245, 190, 78, 0.7);
+  box-shadow: 0 20px 42px rgba(0, 0, 0, 0.42), inset 0 0 0 1px rgba(245, 230, 211, 0.08);
+}
+
+.machine-reel-bank {
+  position: relative;
+}
+
+.machine-reel-bank::before,
+.machine-reel-bank::after {
+  content: "";
+  position: absolute;
+  top: 32%;
+  width: 32px;
+  height: 130px;
+  background: linear-gradient(90deg, #8c5a23, #f0ca61 38%, #5b3418 70%, #25100e);
+  border-radius: 999px;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.42), 0 8px 20px rgba(0, 0, 0, 0.38);
+}
+
+.machine-reel-bank::before {
+  left: -18px;
+}
+
+.machine-reel-bank::after {
+  right: -18px;
+  transform: scaleX(-1);
+}
+
+.draw-stage-card {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(212, 175, 55, 0.16), transparent 42%),
+    linear-gradient(180deg, rgba(36, 17, 34, 0.96), rgba(8, 5, 12, 0.98));
+  border: 1px solid rgba(245, 190, 78, 0.5);
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.42), inset 0 0 0 1px rgba(245, 230, 211, 0.06);
+}
+
+.draw-target-frame {
+  background:
+    linear-gradient(180deg, rgba(245, 230, 211, 0.06), rgba(245, 230, 211, 0.02)),
+    rgba(10, 6, 14, 0.92);
+  border: 1px solid rgba(245, 230, 211, 0.16);
+}
+
+.sidebar-panel {
+  background: linear-gradient(180deg, rgba(35, 16, 43, 0.88), rgba(10, 5, 15, 0.92));
+  border: 1px solid rgba(245, 230, 211, 0.13);
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.26);
+}
+
+.game-chip {
+  border: 1px solid rgba(245, 230, 211, 0.16);
+  background: rgba(245, 230, 211, 0.08);
+  color: var(--text);
+}
+
+.game-chip-strong {
+  border-color: rgba(212, 175, 55, 0.42);
+  background: rgba(212, 175, 55, 0.14);
+  color: #ffe5a0;
+}
+
+.modal-scrim {
+  background:
+    radial-gradient(circle at 50% 12%, rgba(212, 175, 55, 0.12), transparent 28%),
+    rgba(7, 4, 10, 0.84);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.modal-shell {
+  background:
+    linear-gradient(180deg, rgba(47, 27, 57, 0.94), rgba(17, 10, 23, 0.98)),
+    radial-gradient(circle at 50% 0%, rgba(212, 175, 55, 0.18), transparent 42%);
+  border: 1px solid rgba(245, 230, 211, 0.22);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.56), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.modal-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  border: 1px solid rgba(212, 175, 55, 0.38);
+  background: rgba(212, 175, 55, 0.12);
+  color: #f0ca61;
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.modal-content-card {
+  border: 1px solid rgba(245, 230, 211, 0.14);
+  background: rgba(245, 230, 211, 0.06);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.timer-panel {
+  border: 1px solid rgba(212, 175, 55, 0.28);
+  background: linear-gradient(180deg, rgba(212, 175, 55, 0.12), rgba(245, 230, 211, 0.05));
+}
+
+.timer-panel--flash {
+  border-color: rgba(245, 230, 211, 0.86);
+  background: #f5e6d3;
+  color: #32162b;
 }
 
 @keyframes ui-spin {

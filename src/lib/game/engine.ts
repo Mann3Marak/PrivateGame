@@ -1,4 +1,4 @@
-import { GameState, Player, SpinOutcome, SpinResultItem, SpinnerEntry, SpinnerType } from './types';
+import { GameState, Player, SpinOutcome, SpinResultItem, SpinnerEntry, SpinnerType, totalTurnsForRound } from './types';
 import { normalizeEntryForGameplay } from './validation';
 
 const SPINNER_ORDER: SpinnerType[] = ['part', 'action', 'timer'];
@@ -93,7 +93,7 @@ export function executeSpin(state: GameState, player: Player, options?: SpinOpti
 
   const currentRoundCounters = state.session.turnCounters[String(round.roundNumber)];
   const totalTurnsTaken = currentRoundCounters.P1 + currentRoundCounters.P2;
-  const totalLimit = round.totalTurns > 0 ? round.totalTurns : round.quotaPerPlayer * 2;
+  const totalLimit = totalTurnsForRound(round.roundNumber);
   const quotaMet = totalTurnsTaken >= totalLimit;
 
   let roundAdvanced = false;

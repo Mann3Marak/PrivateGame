@@ -180,11 +180,11 @@ function SpinnerEntryEditor({
   );
 }
 
-function formatTimerDraft(totalSeconds: number | null | undefined, unit: 'seconds' | 'minutes'): string {
-  if (totalSeconds == null) {
+function formatTimerDraft(rawValue: number | null | undefined, _unit: 'seconds' | 'minutes'): string {
+  if (rawValue == null) {
     return '';
   }
-  return unit === 'minutes' ? String(+(totalSeconds / 60).toFixed(4)) : String(totalSeconds);
+  return String(rawValue);
 }
 
 function RandomActionEditor({ roundNumber, index, action }: { roundNumber: number; index: number; action: RandomAction }) {
@@ -264,7 +264,7 @@ function RandomActionEditor({ roundNumber, index, action }: { roundNumber: numbe
     if (!Number.isFinite(numeric) || numeric <= 0) {
       return null;
     }
-    const seconds = unit === 'minutes' ? Math.round(numeric * 60) : Math.round(numeric);
+    const seconds = Math.round(numeric);
     return seconds > 0 ? seconds : null;
   };
 

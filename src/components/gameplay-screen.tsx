@@ -1,7 +1,6 @@
 'use client';
 
-import { CSSProperties, useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
+import { CSSProperties, ReactNode, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useGameStore } from '@/src/lib/game/store';
 import { NopeAlternative, Player, RandomAction, Round, SpinResultItem } from '@/src/lib/game/types';
@@ -15,7 +14,7 @@ const REEL_SPIN_DURATION_MS = 1400;
 const REEL_GAP_MS = 220;
 const RANDOM_INSTRUCTION_CHANCE = 1;
 const RANDOM_INSTRUCTION_MIN_SPINS_BETWEEN = 1;
-const PLAYER_IMAGE_FRAME_SIZE_CLASS = 'h-44 w-32 xl:h-56 xl:w-40 2xl:h-64 2xl:w-44';
+const PLAYER_IMAGE_FRAME_SIZE_CLASS = 'h-36 w-28 xl:h-44 xl:w-32 2xl:h-48 2xl:w-36';
 
 type ReelKey = 'part' | 'action' | 'timer';
 
@@ -31,6 +30,15 @@ function buildReelItems(pool: string[], fallback: string): string[] {
 function resolveTimerSeconds(timerSeconds: number | null | undefined, timerUnit: 'seconds' | 'minutes' | null | undefined): number {
   if (!timerSeconds) return 0;
   return timerUnit === 'minutes' ? timerSeconds * 60 : timerSeconds;
+}
+
+function formatCountdown(secondsLeft: number, totalSeconds: number): string {
+  if (totalSeconds >= 60) {
+    const m = Math.floor(secondsLeft / 60);
+    const s = secondsLeft % 60;
+    return s === 0 ? `${m}m` : `${m}m ${s}s`;
+  }
+  return `${secondsLeft}s`;
 }
 
 function parseTimerSeconds(rawText: string | null | undefined): number {
@@ -184,10 +192,13 @@ function SpinResultCard({
   } as CSSProperties;
 
   return (
-    <article className="rounded-xl border border-[#d4af37]/40 bg-[#f5e6d3]/35 p-3 shadow-sm">
-      <h2 className="text-sm font-semibold tracking-wide text-[#5e2a4d]">{label}</h2>
+    <article className="machine-reel-card relative rounded-lg p-3">
+      <h2 className="flex items-center justify-center gap-2 text-center text-sm font-bold text-[#f7d86f]">
+        <span aria-hidden="true">{label === 'Body Part' ? '♙' : label === 'Action' ? '⚡' : '⌛'}</span>
+        {label}
+      </h2>
       <div
-        className={`slot-window relative mt-2 h-28 overflow-hidden rounded-lg border-2 px-2 py-1 ${
+        className={`slot-window relative mt-3 h-32 overflow-hidden rounded-lg border px-2 py-1 xl:h-36 ${
           isSpinning
             ? 'slot-window--spinning border-[#d4af37]/90'
             : shouldPulseOnLand
@@ -204,8 +215,8 @@ function SpinResultCard({
             ))}
           </div>
         ) : (
-          <div className="slot-cell h-full text-center text-sm font-semibold text-[#fadadd]">
-            {isRevealed ? item?.text ?? label : label}
+          <div className="slot-cell h-full text-center text-lg font-bold text-[#f5e6d3]">
+            {isRevealed ? item?.text ?? '—' : '—'}
           </div>
         )}
         <div className="pointer-events-none absolute inset-x-0 top-0 h-5 bg-gradient-to-b from-[#2f1530] to-transparent" />
@@ -220,8 +231,8 @@ function SpinResultCard({
           }`}
         />
       </div>
-      <p className="mt-2 text-sm text-[#5e2a4d]">
-        {isSpinning ? 'Spinning...' : isRevealed ? `Result: ${item?.text ?? label}` : 'Waiting...'}
+      <p className="mt-2 text-center text-xs font-medium text-[#d9c4c8]">
+        Result: <span className="text-[#ff7ca8]">{isSpinning ? 'Spinning...' : isRevealed ? item?.text ?? label : 'Waiting...'}</span>
       </p>
     </article>
   );
@@ -232,10 +243,10 @@ function OverlayResultCard({ label, item }: { label: 'Body Part' | 'Action' | 'T
   const hasImage = Boolean(item.imageRef) && !imageFailed;
 
   return (
-    <article className="rounded-xl border border-[#d4af37]/70 bg-[#5e2a4d]/70 p-4 text-center">
-      <p className="text-sm font-semibold uppercase tracking-wider text-[#d4af37]">{label}</p>
+    <article className="modal-content-card rounded-lg p-4 text-center">
+      <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#f0ca61]">{label}</p>
       {hasImage ? (
-        <div className="relative mt-4 h-44 overflow-hidden rounded border border-[#d4af37]/50 bg-[#3a1a30]">
+        <div className="relative mt-3 h-28 overflow-hidden rounded-lg border border-[#f5e6d3]/14 bg-[#120b17]">
           <Image
             alt={`${label} overlay result`}
             className="object-contain"
@@ -246,7 +257,29 @@ function OverlayResultCard({ label, item }: { label: 'Body Part' | 'Action' | 'T
           />
         </div>
       ) : null}
-      <p className="mt-4 text-3xl font-bold text-[#f5e6d3]">{item.text}</p>
+      <p className="mt-3 text-xl font-bold text-[#fff7ef]">{item.text}</p>
+    </article>
+  );
+}
+
+function ModalOverlay({ zIndex = 'z-50', children }: { zIndex?: string; children: ReactNode }) {
+  return (
+    <div className={`modal-scrim fixed inset-0 ${zIndex} flex items-center justify-center p-4`} role="presentation">
+      {children}
+    </div>
+  );
+}
+
+function TimerPanel({
+  isFlashing,
+  children
+}: {
+  isFlashing: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <article className={`mt-4 rounded-lg p-3 text-center transition-colors ${isFlashing ? 'timer-panel--flash' : 'timer-panel text-[#fff7ef]'}`}>
+      {children}
     </article>
   );
 }
@@ -293,8 +326,10 @@ export function GameplayScreen() {
   const [isGameOverTimerRunning, setIsGameOverTimerRunning] = useState(false);
   const [isGameOverTimerFlashing, setIsGameOverTimerFlashing] = useState(false);
   const [isGameOverTimerFlashOn, setIsGameOverTimerFlashOn] = useState(false);
+  const isSpinningRef = useRef(false);
   const spinsSinceRandomInstructionRef = useRef(999);
   const shownRoundIntrosRef = useRef<Set<number>>(new Set());
+  const pendingRoundIntroRef = useRef<Round | null>(null);
   const pendingActionOnlyAdvanceRef = useRef<Player | null>(null);
   const spinTimelineTimeoutsRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   const overlayTickIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -330,6 +365,8 @@ export function GameplayScreen() {
   const hydrateFromCloud = useGameStore((state) => state.hydrateFromCloud);
   const spin = useGameStore((state) => state.spin);
   const advanceActionTurn = useGameStore((state) => state.advanceActionTurn);
+  const forceAdvanceToNextRound = useGameStore((state) => state.forceAdvanceToNextRound);
+  const switchActivePlayer = useGameStore((state) => state.switchActivePlayer);
   const markRandomInstructionDone = useGameStore((state) => state.markRandomInstructionDone);
   const restartGame = useGameStore((state) => state.restartGame);
   const pause = useGameStore((state) => state.pause);
@@ -337,7 +374,7 @@ export function GameplayScreen() {
 
   const currentRound = game.rounds.find((round) => round.roundNumber === game.session.currentRoundNumber) ?? game.rounds[0];
   const isLastRound = game.session.currentRoundNumber === game.rounds[game.rounds.length - 1]?.roundNumber;
-  const isActionsOnlyRound = currentRound.mode === 'actions-only';
+  const isActionsOnlyRound = !isSpinning && currentRound.mode === 'actions-only';
   const roundCounter = game.session.turnCounters[String(currentRound.roundNumber)] ?? { P1: 0, P2: 0 };
   const roundTotalLimit = currentRound.totalTurns > 0 ? currentRound.totalTurns : currentRound.quotaPerPlayer * 2;
   const isGameComplete = isLastRound && (roundCounter.P1 + roundCounter.P2) >= roundTotalLimit;
@@ -421,7 +458,7 @@ export function GameplayScreen() {
     if (shownRoundIntrosRef.current.has(roundNumber)) {
       return;
     }
-    if (showResultOverlay || showRandomInstructionOverlay || showNopeTaskOverlay || isSpinning) {
+    if (showResultOverlay || showRandomInstructionOverlay || showNopeTaskOverlay || isSpinningRef.current) {
       return;
     }
     const counters = game.session.turnCounters[String(roundNumber)] ?? { P1: 0, P2: 0 };
@@ -550,6 +587,7 @@ export function GameplayScreen() {
     });
 
     scheduleTimeline(allDone, () => {
+      isSpinningRef.current = false;
       setIsSpinning(false);
       setShowResultOverlay(true);
     });
@@ -587,6 +625,19 @@ export function GameplayScreen() {
       setPendingRandomInstructionIndex(null);
       setPendingRandomInstructionRoundNumber(null);
     }
+  };
+
+  const maybeShowRoundIntro = () => {
+    const round = pendingRoundIntroRef.current;
+    if (!round || shownRoundIntrosRef.current.has(round.roundNumber)) {
+      pendingRoundIntroRef.current = null;
+      return;
+    }
+    shownRoundIntrosRef.current.add(round.roundNumber);
+    pendingRoundIntroRef.current = null;
+    setActiveRoundIntro(round);
+    setShowRoundIntroOverlay(true);
+    void playGameAudio('round');
   };
 
   const clearGameOverTimerIntervals = () => {
@@ -672,6 +723,7 @@ export function GameplayScreen() {
       return;
     }
     showNextQueuedOverlay(options);
+    maybeShowRoundIntro();
   };
 
   const startTimerFlashAndClose = () => {
@@ -812,9 +864,15 @@ export function GameplayScreen() {
     // In actions-only rounds, a full dismissal (without a Nope detour) advances the turn.
     if (isFinalDismissal && pendingActionOnlyAdvanceRef.current) {
       const player = pendingActionOnlyAdvanceRef.current;
+      const preRoundNumber = game.session.currentRoundNumber;
       pendingActionOnlyAdvanceRef.current = null;
       advanceActionTurn(player);
+      const postRoundNumber = useGameStore.getState().game.session.currentRoundNumber;
+      if (postRoundNumber !== preRoundNumber) {
+        pendingRoundIntroRef.current = game.rounds.find((r) => r.roundNumber === postRoundNumber) ?? null;
+      }
     }
+    maybeShowRoundIntro();
   };
 
   const onNopeRandomInstruction = () => {
@@ -847,9 +905,15 @@ export function GameplayScreen() {
     setNopeTaskImageFailed(false);
     if (pendingActionOnlyAdvanceRef.current) {
       const player = pendingActionOnlyAdvanceRef.current;
+      const preRoundNumber = game.session.currentRoundNumber;
       pendingActionOnlyAdvanceRef.current = null;
       advanceActionTurn(player);
+      const postRoundNumber = useGameStore.getState().game.session.currentRoundNumber;
+      if (postRoundNumber !== preRoundNumber) {
+        pendingRoundIntroRef.current = game.rounds.find((r) => r.roundNumber === postRoundNumber) ?? null;
+      }
     }
+    maybeShowRoundIntro();
   };
 
   const startNopeTimerFlashAndFinish = () => {
@@ -881,7 +945,7 @@ export function GameplayScreen() {
     }
 
     clearNopeTimerIntervals();
-    setNopeSecondsLeft(activeNopeTask.timerSeconds);
+    setNopeSecondsLeft(resolveTimerSeconds(activeNopeTask.timerSeconds, activeNopeTask.timerUnit));
     setIsNopeTimerRunning(true);
     nopeTickIntervalRef.current = setInterval(() => {
       setNopeSecondsLeft((previous) => {
@@ -917,11 +981,24 @@ export function GameplayScreen() {
     const preSpinRoundNumber = game.session.currentRoundNumber;
     const preSpinRound = game.rounds.find((round) => round.roundNumber === preSpinRoundNumber) ?? game.rounds[0];
     const playerWhoSpins = game.session.activePlayer;
+    // Set the ref synchronously before spin() so the round-intro useEffect sees it
+    // immediately — even in the sync-priority render that useSyncExternalStore forces
+    // before React's batched useState updates are committed.
+    isSpinningRef.current = true;
+    setIsSpinning(true);
     const outcome = spin(playerWhoSpins);
-    if (outcome.ok) {
+    if (!outcome.ok) {
+      isSpinningRef.current = false;
+      setIsSpinning(false);
+      return;
+    }
+    {
       setSpinningPlayer(playerWhoSpins);
       const postSpinRoundNumber = useGameStore.getState().game.session.currentRoundNumber;
       const roundAdvanced = postSpinRoundNumber !== preSpinRoundNumber;
+      if (roundAdvanced) {
+        pendingRoundIntroRef.current = game.rounds.find((r) => r.roundNumber === postSpinRoundNumber) ?? null;
+      }
       spinsSinceRandomInstructionRef.current += 1;
       const preTurnCount =
         (game.session.turnCounters[String(preSpinRoundNumber)]?.P1 ?? 0) +
@@ -974,7 +1051,6 @@ export function GameplayScreen() {
       setPendingRandomInstructionIndex(randomInstructionPick?.index ?? null);
       setPendingRandomInstructionRoundNumber(randomInstructionPick ? preSpinRoundNumber : null);
       setShowResultOverlay(false);
-      setIsSpinning(true);
       runSequentialSpinTimeline();
     }
   };
@@ -987,26 +1063,42 @@ export function GameplayScreen() {
     const preRound = game.rounds.find((round) => round.roundNumber === preRoundNumber) ?? game.rounds[0];
     const playerWhoDraws = game.session.activePlayer;
     const completedForRound = game.session.completedRandomInstructions?.[String(preRoundNumber)] ?? [];
-    // Filter only by content + assigned player + completion. Cooldown does not apply here.
     const doneSet = new Set(completedForRound);
     const candidates = preRound.randomActions
       .map((action, originalIndex) => ({ action, index: originalIndex }))
       .filter(({ action, index }) => {
-        if (doneSet.has(index)) {
-          return false;
-        }
+        if (doneSet.has(index)) return false;
         const text = action.text?.trim() ?? '';
         const hasContent = text.length > 0 || Boolean(action.imageRef) || Boolean(action.linkUrl);
-        if (!hasContent) {
-          return false;
-        }
+        if (!hasContent) return false;
         const assigned = action.assignedPlayer ?? 'any';
         return assigned === 'any' || assigned === playerWhoDraws;
       });
 
     if (candidates.length === 0) {
-      // No draw to show — just burn a turn so the round can still complete.
-      advanceActionTurn(playerWhoDraws);
+      // Check if the other player still has undrawn actions.
+      const otherPlayer: Player = playerWhoDraws === 'P1' ? 'P2' : 'P1';
+      const hasActionsForOther = preRound.randomActions.some((action, originalIndex) => {
+        if (doneSet.has(originalIndex)) return false;
+        const text = action.text?.trim() ?? '';
+        const hasContent = text.length > 0 || Boolean(action.imageRef) || Boolean(action.linkUrl);
+        if (!hasContent) return false;
+        const assigned = action.assignedPlayer ?? 'any';
+        return assigned === 'any' || assigned === otherPlayer;
+      });
+
+      if (hasActionsForOther) {
+        // Other player still has actions — pass the turn without counting it.
+        switchActivePlayer();
+      } else {
+        // No actions left for either player — advance to the next round.
+        forceAdvanceToNextRound();
+        const postRoundNumber = useGameStore.getState().game.session.currentRoundNumber;
+        if (postRoundNumber !== preRoundNumber) {
+          pendingRoundIntroRef.current = game.rounds.find((r) => r.roundNumber === postRoundNumber) ?? null;
+          maybeShowRoundIntro();
+        }
+      }
       return;
     }
 
@@ -1016,7 +1108,7 @@ export function GameplayScreen() {
     setIsRandomInstructionTimerRunning(false);
     setIsRandomInstructionTimerFlashing(false);
     setIsRandomInstructionTimerFlashOn(false);
-    setRandomInstructionSecondsLeft(pick.action.timerSeconds ?? 0);
+    setRandomInstructionSecondsLeft(resolveTimerSeconds(pick.action.timerSeconds, pick.action.timerUnit));
     setRandomInstructionImageFailed(false);
     setRandomInstructionStepImageFailed(false);
     setRandomInstructionStep(1);
@@ -1030,6 +1122,7 @@ export function GameplayScreen() {
   const onRestart = () => {
     shownRoundIntrosRef.current = new Set();
     spinsSinceRandomInstructionRef.current = 999;
+    pendingRoundIntroRef.current = null;
     pendingActionOnlyAdvanceRef.current = null;
     clearSpinTimelineTimeouts();
     clearReelStopTimeouts();
@@ -1082,127 +1175,160 @@ export function GameplayScreen() {
       randomActionSoundRef.current.currentTime = 0;
     }
     closeResultOverlay({ skipRandomInstruction: true, skipGameOver: true });
+    isSpinningRef.current = false;
     setIsSpinning(false);
     restartGame();
   };
 
+  const navigateTo = (path: string) => {
+    window.location.assign(path);
+  };
+
   return (
-    <main className={PAGE_CONTAINER_CLASS}>
-      <nav className="glass-panel mb-4 flex items-center justify-between rounded-xl p-3">
-        <h1 className="heading-elegant text-3xl font-semibold">Sensual Slot Machine</h1>
-        <div className="flex gap-3 text-sm font-medium">
-          <Link className="underline" href="/">
+    <main className="game-app-shell mx-auto min-h-screen w-full max-w-[1920px] px-1 py-2 md:px-2">
+      <nav className="game-topbar mb-2 flex items-center justify-between rounded-lg px-3 py-2">
+        <div className="flex items-center gap-3">
+          <span className="brand-orb" aria-hidden="true">✦</span>
+          <h1 className="heading-elegant text-lg font-bold md:text-xl">Sensual Slot Machine</h1>
+        </div>
+        <div className="flex items-center gap-2 text-xs font-semibold text-[#d9c4c8]">
+          <button className="rounded-md bg-[#f0ca61]/10 px-3 py-2 text-[#f7d86f] transition hover:bg-[#f5e6d3]/10 hover:text-[#fff7ef]" onClick={() => navigateTo('/')} type="button">
+            <span aria-hidden="true" className="mr-2">▣</span>
             Gameplay
-          </Link>
-          <button className="underline" onClick={onRestart} type="button">
+          </button>
+          <button className="rounded-md px-3 py-2 transition hover:bg-[#f5e6d3]/10 hover:text-[#fff7ef]" onClick={onRestart} type="button">
+            <span aria-hidden="true" className="mr-2">↻</span>
             Restart
           </button>
-          <Link className="underline" href="/dashboard">
+          <button className="rounded-md px-3 py-2 transition hover:bg-[#f5e6d3]/10 hover:text-[#fff7ef]" onClick={() => navigateTo('/dashboard')} type="button">
+            <span aria-hidden="true" className="mr-2">▦</span>
             Dashboard
-          </Link>
+          </button>
         </div>
       </nav>
 
-      {recoveryNotice ? <p className="mb-3 rounded bg-[#f5e6d3] p-2 text-sm text-[#5e2a4d]">{recoveryNotice}</p> : null}
+      {recoveryNotice ? <p className="mb-3 rounded-lg border border-[#f5e6d3]/16 bg-[#f5e6d3]/10 p-3 text-sm text-[#fff7ef]">{recoveryNotice}</p> : null}
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <article className="glass-card rounded-xl p-4 md:col-span-2 xl:min-h-[760px] 2xl:min-h-[860px]">
-          <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
-            <span className="rounded-full bg-emerald-100 px-3 py-1">Current Round: {currentRound.name}</span>
-            <span className="rounded-full bg-slate-100 px-3 py-1">
+      <section className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(320px,32vw)]">
+        <article className="game-stage rounded-lg p-3">
+          <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+            <span className="game-chip-strong rounded-lg px-3 py-2">◎ Round {currentRound.roundNumber}</span>
+            <span className="game-chip rounded-lg px-3 py-2">
+              ↻
               Turns: {roundCounter.P1 + roundCounter.P2}/{currentRound.totalTurns} (P1 {roundCounter.P1} · P2 {roundCounter.P2})
             </span>
             {game.session.isPaused ? (
-              <button className="btn-luxe-outline ml-auto rounded px-4 py-2" onClick={resume} type="button">
+              <button className="btn-luxe-outline ml-auto rounded-lg px-4 py-2 text-xs" onClick={resume} type="button">
                 Resume
               </button>
             ) : (
-              <button className="btn-luxe-outline ml-auto rounded px-4 py-2" onClick={pause} type="button">
+              <button className="btn-luxe-outline ml-auto rounded-lg px-4 py-2 text-xs" onClick={pause} type="button">
+                <span aria-hidden="true" className="mr-2">Ⅱ</span>
                 Pause
               </button>
             )}
           </div>
 
-          {spinError ? <p className="mb-3 text-sm text-red-700">{spinError}</p> : null}
+          {spinError ? <p className="mb-3 rounded-lg border border-red-300/30 bg-red-950/40 p-3 text-sm text-red-100">{spinError}</p> : null}
 
-          <div className="mb-6 flex justify-center">
-            <article className="glass-panel w-full max-w-sm rounded-2xl border border-[#d4af37]/70 p-4 text-center">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#d4af37]">Current Spinner</p>
-              {currentSpinnerImage && !currentSpinnerImageFailed ? (
-                <div
-                  className={`relative mx-auto mt-2 overflow-hidden rounded-xl border border-[#d4af37]/45 bg-[#2f1530] ${PLAYER_IMAGE_FRAME_SIZE_CLASS}`}
-                >
-                  <Image
-                    alt={`${currentSpinnerPlayer} current spinner image`}
-                    className="object-contain"
-                    fill
-                    onError={() => {
-                      if (currentSpinnerImage) {
-                        setFailedImageMap((previous) => ({ ...previous, [currentSpinnerImage]: true }));
-                      }
-                    }}
-                    sizes="128px"
-                    src={currentSpinnerImage}
-                  />
+          <div className="game-machine rounded-lg px-4 pb-5 pt-3 md:px-6">
+            <div className="relative z-10">
+              <div className="mb-2 flex items-center justify-center gap-4">
+                <span className="h-px w-28 bg-gradient-to-l from-[#f0ca61] to-transparent" />
+                <p className="text-xs font-bold text-[#f7d86f]">Current Spinner</p>
+                <span className="h-px w-28 bg-gradient-to-r from-[#f0ca61] to-transparent" />
+              </div>
+              <article className="player-spotlight mx-auto mb-2 flex h-24 w-24 flex-col items-center justify-center overflow-hidden rounded-full p-2 text-center">
+                {currentSpinnerImage && !currentSpinnerImageFailed ? (
+                  <div
+                    className="relative h-full w-full overflow-hidden rounded-full bg-[#120b17]"
+                  >
+                    <Image
+                      alt={`${currentSpinnerPlayer} current spinner image`}
+                      className="object-contain"
+                      fill
+                      onError={() => {
+                        if (currentSpinnerImage) {
+                          setFailedImageMap((previous) => ({ ...previous, [currentSpinnerImage]: true }));
+                        }
+                      }}
+                      sizes="96px"
+                      src={currentSpinnerImage}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-1 text-[#c96c9e]">
+                    <span className="text-4xl" aria-hidden="true">♙</span>
+                    <span className="text-[10px]">Add player image</span>
+                  </div>
+                )}
+              </article>
+
+              {isActionsOnlyRound ? (
+                <div className="mx-auto flex max-w-xl flex-col items-center py-8">
+                  <article className="draw-stage-card w-full rounded-lg p-5 text-center">
+                    <p className="flex items-center justify-center gap-2 text-sm font-bold text-[#f7d86f]">
+                      <span aria-hidden="true">⚡</span>
+                      Action Draw
+                    </p>
+                    <p className="mt-2 text-sm text-[#d9c4c8]">
+                      Draw a task for <span className="font-bold text-[#fff7ef]">{nextSpinnerPlayer}</span>.
+                    </p>
+                    <div className="draw-target-frame mx-auto mt-5 flex w-full max-w-sm items-center gap-4 rounded-lg p-3 text-left">
+                      {nextSpinnerImage && !nextSpinnerImageFailed ? (
+                        <span className="relative h-28 w-20 shrink-0 overflow-hidden rounded-lg border border-[#f5e6d3]/16 bg-[#120b17]">
+                          <Image
+                            alt={`${nextSpinnerPlayer} next draw image`}
+                            className="object-contain"
+                            fill
+                            onError={() => {
+                              if (nextSpinnerImage) {
+                                setFailedImageMap((previous) => ({ ...previous, [nextSpinnerImage]: true }));
+                              }
+                            }}
+                            sizes="80px"
+                            src={nextSpinnerImage}
+                          />
+                        </span>
+                      ) : (
+                        <span className="flex h-28 w-20 shrink-0 items-center justify-center rounded-lg border border-[#f5e6d3]/16 bg-[#120b17] px-2 text-center text-[10px] text-[#d9c4c8]">
+                          Set image
+                        </span>
+                      )}
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#f0ca61]">Target Player</p>
+                        <p className="mt-1 text-3xl font-black text-[#fff7ef]">{nextSpinnerPlayer}</p>
+                        <p className="mt-2 text-xs leading-relaxed text-[#d9c4c8]">
+                          Action-only round. No body part or timer reel is used here.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-6 flex justify-center">
+                      <div className="spin-dock rounded-full p-2">
+                        <button
+                          aria-label={`Draw action for ${nextSpinnerPlayer}`}
+                          className="btn-luxe min-w-44 rounded-full px-10 py-3 text-base font-bold tracking-wide disabled:cursor-not-allowed disabled:opacity-60"
+                          disabled={
+                            game.session.isPaused ||
+                            isSpinning ||
+                            showResultOverlay ||
+                            showRandomInstructionOverlay ||
+                            showRoundIntroOverlay ||
+                            showNopeTaskOverlay
+                          }
+                          onClick={onDrawAction}
+                          type="button"
+                        >
+                          <span aria-hidden="true" className="mr-2">⚡</span>
+                          Draw Action
+                        </button>
+                      </div>
+                    </div>
+                  </article>
                 </div>
               ) : (
-                <div
-                  className={`mx-auto mt-2 flex items-center justify-center rounded-xl border border-[#d4af37]/35 bg-[#2f1530] text-xs text-[#fadadd] ${PLAYER_IMAGE_FRAME_SIZE_CLASS}`}
-                >
-                  Add player image in Dashboard
-                </div>
-              )}
-            </article>
-          </div>
-
-          {isActionsOnlyRound ? (
-            <div className="flex flex-col items-center gap-5 py-6">
-              <p className="text-center text-sm text-[#5e2a4d]">
-                This round is action-only. Draw a task for {nextSpinnerPlayer}.
-              </p>
-              <button
-                aria-label={`Draw action for ${nextSpinnerPlayer}`}
-                className="btn-luxe rounded-2xl px-6 py-4 text-base font-bold tracking-wide disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={
-                  game.session.isPaused ||
-                  showResultOverlay ||
-                  showRandomInstructionOverlay ||
-                  showRoundIntroOverlay ||
-                  showNopeTaskOverlay
-                }
-                onClick={onDrawAction}
-                type="button"
-              >
-                <span className="flex flex-col items-center gap-3">
-                  {nextSpinnerImage && !nextSpinnerImageFailed ? (
-                    <span className={`relative overflow-hidden rounded-xl border border-[#f5e6d3]/60 bg-[#2f1530] ${PLAYER_IMAGE_FRAME_SIZE_CLASS}`}>
-                      <Image
-                        alt={`${nextSpinnerPlayer} next draw image`}
-                        className="object-contain"
-                        fill
-                        onError={() => {
-                          if (nextSpinnerImage) {
-                            setFailedImageMap((previous) => ({ ...previous, [nextSpinnerImage]: true }));
-                          }
-                        }}
-                        sizes="176px"
-                        src={nextSpinnerImage}
-                      />
-                    </span>
-                  ) : (
-                    <span
-                      className={`flex items-center justify-center rounded-xl border border-[#f5e6d3]/50 bg-[#2f1530] text-xs text-[#f5e6d3] ${PLAYER_IMAGE_FRAME_SIZE_CLASS}`}
-                    >
-                      Set player image
-                    </span>
-                  )}
-                  <span>Draw Action</span>
-                </span>
-              </button>
-            </div>
-          ) : (
-            <>
-              <div className={`grid gap-3 ${isLastRound ? 'md:grid-cols-2' : 'md:grid-cols-3'}`}>
+                <div>
+              <div className={`machine-reel-bank mx-auto grid max-w-5xl gap-3 px-4 ${isLastRound ? 'md:grid-cols-2' : 'md:grid-cols-3'}`}>
                 {!isLastRound && (
                   <SpinResultCard
                     item={game.session.lastSpinResult?.part ?? null}
@@ -1234,10 +1360,11 @@ export function GameplayScreen() {
                 />
               </div>
 
-              <div className="mt-5 flex justify-center">
+              <div className="mt-8 flex justify-center">
+                <div className="spin-dock rounded-full p-2">
                 <button
                   aria-label={`Spin turn for ${nextSpinnerPlayer}`}
-                  className="btn-luxe rounded-2xl px-6 py-4 text-base font-bold tracking-wide disabled:cursor-not-allowed disabled:opacity-60"
+                  className="btn-luxe min-w-40 rounded-full px-10 py-3 text-base font-bold tracking-wide disabled:cursor-not-allowed disabled:opacity-60"
                   disabled={
                     game.session.isPaused ||
                     isSpinning ||
@@ -1250,17 +1377,24 @@ export function GameplayScreen() {
                   onClick={onSpin}
                   type="button"
                 >
+                  <span aria-hidden="true" className="mr-2">↻</span>
                   {isSpinning ? 'Spinning...' : 'Spin'}
                 </button>
+                </div>
               </div>
-            </>
-          )}
+                </div>
+              )}
+            </div>
+          </div>
         </article>
 
-        <aside className="space-y-4">
-          <article className="glass-card rounded-xl p-4 xl:min-h-[376px]">
-            <h2 className="text-sm font-semibold">Side Video</h2>
-            <div className="slot-window slot-window--idle mt-2 h-56 overflow-hidden rounded-lg border border-[#f5e6d3]/70 xl:h-80 2xl:h-[22rem]">
+        <aside className="space-y-2">
+          <article className="sidebar-panel rounded-lg p-3">
+            <h2 className="flex items-center gap-2 text-sm font-bold text-[#f7d86f]">
+              <span aria-hidden="true">▤</span>
+              Side Video
+            </h2>
+            <div className="slot-window slot-window--idle mt-3 h-56 overflow-hidden rounded-lg border border-[#f05c9b]/35 xl:h-[clamp(220px,26vw,380px)]">
               {sideVideoEmbedUrl ? (
                 <iframe
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -1271,143 +1405,140 @@ export function GameplayScreen() {
                   title="YouTube side video"
                 />
               ) : (
-                <div className="flex h-full items-center justify-center text-xs text-[#fadadd]">No YouTube video set</div>
+                <div className="flex h-full items-center justify-center text-xs text-[#d9c4c8]">No YouTube video set</div>
               )}
             </div>
             {game.sideVideoUrl ? (
-              <a className="mt-2 inline-block text-xs underline" href={game.sideVideoUrl} rel="noreferrer noopener" target="_blank">
+              <a className="mt-3 inline-block text-xs font-semibold text-[#f0ca61] underline" href={game.sideVideoUrl} rel="noreferrer noopener" target="_blank">
                 If blocked, open video in YouTube
               </a>
             ) : null}
           </article>
-          <article className="glass-card rounded-xl p-4 xl:min-h-[160px]">
-            <h2 className="text-sm font-semibold">Rules</h2>
-            <p className="mt-2 max-h-16 overflow-hidden text-sm whitespace-pre-wrap xl:max-h-24">{game.rulesText}</p>
-            <button className="btn-luxe-outline mt-3 rounded px-3 py-1.5 text-xs font-semibold" onClick={() => setShowRulesOverlay(true)} type="button">
+          <article className="sidebar-panel rounded-lg p-4">
+            <h2 className="flex items-center gap-2 text-sm font-bold text-[#f7d86f]">
+              <span aria-hidden="true">♢</span>
+              Rules
+            </h2>
+            <p className="mt-3 max-h-16 overflow-hidden text-xs leading-relaxed whitespace-pre-wrap text-[#d9c4c8] xl:max-h-24">{game.rulesText}</p>
+            <button className="btn-luxe-outline mt-4 rounded-lg border-[#ff6b9e]/35 px-4 py-2 text-xs font-semibold text-[#f5e6d3]" onClick={() => setShowRulesOverlay(true)} type="button">
               More...
             </button>
           </article>
         </aside>
       </section>
       {showResultOverlay && game.session.lastSpinResult ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-[#3a1a30]/75 p-4"
-          role="presentation"
-        >
+        <ModalOverlay>
           <section
-            className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-y-auto rounded-2xl border-2 border-[#d4af37] bg-gradient-to-b from-[#5e2a4d] to-[#3a1a30] p-6 shadow-2xl"
+            className="modal-shell flex max-h-[92vh] w-full max-w-5xl flex-col overflow-y-auto rounded-lg p-4"
             onClick={(event) => event.stopPropagation()}
           >
-            <h2 className="heading-elegant text-center text-4xl font-bold tracking-wide text-[#f5e6d3]">Spin Result</h2>
-            <p className="mt-1 text-center text-sm text-[#fadadd]/85">Review the result, then press Done to continue</p>
-            <div className="mx-auto mt-5 flex w-full max-w-sm flex-col items-center rounded-xl border border-[#d4af37]/70 bg-[#5e2a4d]/60 p-4 text-center">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#d4af37]">This is your task</p>
-              {resultActionImage && !resultActionImageFailed ? (
-                <div className={`relative mt-3 overflow-hidden rounded-xl border border-[#d4af37]/45 bg-[#2f1530] ${PLAYER_IMAGE_FRAME_SIZE_CLASS}`}>
-                  <Image
-                    alt={`${resultActionPlayer} action spotlight`}
-                    className="object-contain"
-                    fill
-                    onError={() => {
-                      if (resultActionImage) {
-                        setFailedImageMap((previous) => ({ ...previous, [resultActionImage]: true }));
-                      }
-                    }}
-                    sizes="176px"
-                    src={resultActionImage}
-                  />
-                </div>
-              ) : (
-                <div
-                  className={`mt-3 flex items-center justify-center rounded-xl border border-[#d4af37]/35 bg-[#2f1530] text-xs text-[#fadadd] ${PLAYER_IMAGE_FRAME_SIZE_CLASS}`}
-                >
-                  Add player image in Dashboard
-                </div>
-              )}
-              <p className="mt-3 text-sm font-semibold tracking-wide text-[#f5e6d3]">Remeber to have fun!</p>
+            <div className="text-center">
+              <span className="modal-badge">Spin Result</span>
+              <h2 className="heading-elegant mt-2 text-2xl font-bold tracking-wide text-[#fff7ef] md:text-3xl">Spin Result</h2>
+              <p className="mt-1 text-xs text-[#d9c4c8]">Review the result, then press Done to continue</p>
             </div>
-            <div className={`mt-6 grid gap-4 ${isLastRound ? 'md:grid-cols-2' : 'md:grid-cols-3'}`}>
-              {!isLastRound && game.session.lastSpinResult.part ? (
-                <OverlayResultCard item={game.session.lastSpinResult.part} label="Body Part" />
-              ) : null}
-              <OverlayResultCard item={game.session.lastSpinResult.action} label="Action" />
-              <OverlayResultCard item={game.session.lastSpinResult.timer} label="Timer" />
-            </div>
-            <article
-              className={`mt-6 rounded-xl border p-4 text-center transition-colors ${
-                isTimerFlashing && isTimerFlashOn
-                  ? 'border-[#f5e6d3] bg-[#f5e6d3] text-[#5e2a4d]'
-                  : 'border-[#d4af37]/70 bg-[#5e2a4d]/65 text-[#f5e6d3]'
-              }`}
-            >
-              <p className="text-sm font-semibold uppercase tracking-wider text-[#d4af37]">Countdown</p>
-              <p className="mt-3 text-5xl font-black tabular-nums">{overlaySecondsLeft}s</p>
-              <p className="mt-2 text-sm text-[#fadadd]/90">
-                Source: {game.session.lastSpinResult.timer.text || `${DEFAULT_OVERLAY_TIMER_SECONDS} seconds default`}
-              </p>
-              <div className="mt-4">
-                <button
-                  className="btn-luxe rounded px-5 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={isOverlayTimerRunning || isTimerFlashing}
-                  onClick={startOverlayTimer}
-                  type="button"
-                >
-                  {isOverlayTimerRunning ? 'Running...' : 'Start Timer'}
-                </button>
+            <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+              <div>
+                <div className="modal-content-card mx-auto flex w-full max-w-xs flex-col items-center rounded-lg p-3 text-center">
+                  <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#f0ca61]">This is your task</p>
+                  {resultActionImage && !resultActionImageFailed ? (
+                    <div className={`relative mt-2 overflow-hidden rounded-lg border border-[#f5e6d3]/16 bg-[#120b17] ${PLAYER_IMAGE_FRAME_SIZE_CLASS}`}>
+                      <Image
+                        alt={`${resultActionPlayer} action spotlight`}
+                        className="object-contain"
+                        fill
+                        onError={() => {
+                          if (resultActionImage) {
+                            setFailedImageMap((previous) => ({ ...previous, [resultActionImage]: true }));
+                          }
+                        }}
+                        sizes="144px"
+                        src={resultActionImage}
+                      />
+                    </div>
+                  ) : (
+                    <div
+                      className={`mt-2 flex items-center justify-center rounded-lg border border-[#f5e6d3]/16 bg-[#120b17] px-4 text-xs text-[#d9c4c8] ${PLAYER_IMAGE_FRAME_SIZE_CLASS}`}
+                    >
+                      Add player image in Dashboard
+                    </div>
+                  )}
+                  <p className="mt-2 text-xs font-semibold tracking-wide text-[#fff7ef]">Remember to have fun!</p>
+                </div>
+                <div className={`mt-4 grid gap-3 ${isLastRound ? 'md:grid-cols-2' : 'md:grid-cols-3'}`}>
+                  {!isLastRound && game.session.lastSpinResult.part ? (
+                    <OverlayResultCard item={game.session.lastSpinResult.part} label="Body Part" />
+                  ) : null}
+                  <OverlayResultCard item={game.session.lastSpinResult.action} label="Action" />
+                  <OverlayResultCard item={game.session.lastSpinResult.timer} label="Timer" />
+                </div>
               </div>
-            </article>
-            <div className="mt-5 flex justify-center">
-              <button className="btn-luxe rounded px-6 py-2 text-sm font-semibold" onClick={() => closeResultOverlay()} type="button">
+              <TimerPanel isFlashing={isTimerFlashing && isTimerFlashOn}>
+                <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#f0ca61]">Countdown</p>
+                <p className="mt-2 text-4xl font-black tabular-nums">{formatCountdown(overlaySecondsLeft, overlayTimerSeconds)}</p>
+                <p className="mt-2 text-xs text-[#d9c4c8]">
+                  Source: {game.session.lastSpinResult.timer.text || `${DEFAULT_OVERLAY_TIMER_SECONDS} seconds default`}
+                </p>
+                <div className="mt-3">
+                  <button
+                    className="btn-luxe modal-action-button modal-action-button--sm disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={isOverlayTimerRunning || isTimerFlashing}
+                    onClick={startOverlayTimer}
+                    type="button"
+                  >
+                    {isOverlayTimerRunning ? 'Running...' : 'Start Timer'}
+                  </button>
+                </div>
+              </TimerPanel>
+            </div>
+            <div className="mt-4 flex justify-center">
+              <button className="btn-luxe modal-action-button" onClick={() => closeResultOverlay()} type="button">
                 Done
               </button>
             </div>
             {currentRound.chickenOutText?.trim() ? (
-              <div className="mt-4 rounded-xl border border-[#d4af37]/40 bg-[#3a1a30]/60 px-4 py-3 text-center">
-                <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#d4af37]">Chicken Out</p>
-                <p className="mt-1 whitespace-pre-wrap text-sm text-[#fadadd]/85">{currentRound.chickenOutText}</p>
+              <div className="modal-content-card mt-3 rounded-lg px-4 py-2 text-center">
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#f0ca61]">Chicken Out</p>
+                <p className="mt-1 whitespace-pre-wrap text-xs text-[#d9c4c8]">{currentRound.chickenOutText}</p>
               </div>
             ) : null}
             {game.resultInfoText?.trim() ? (
-              <p className="mt-3 whitespace-pre-wrap text-center text-xs italic text-[#fadadd]/70">
+              <p className="mt-3 whitespace-pre-wrap text-center text-xs italic text-[#d9c4c8]/80">
                 {game.resultInfoText}
               </p>
             ) : null}
           </section>
-        </div>
+        </ModalOverlay>
       ) : null}
       {showRulesOverlay ? (
-        <div
-          className="fixed inset-0 z-40 flex items-center justify-center bg-[#3a1a30]/75 p-4"
-          onClick={() => setShowRulesOverlay(false)}
-          role="presentation"
-        >
+        <ModalOverlay zIndex="z-40">
           <section
-            className="glass-panel w-full max-w-3xl rounded-2xl border border-[#d4af37]/60 p-5"
+            className="modal-shell w-full max-w-3xl rounded-lg p-5"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="heading-elegant text-3xl font-semibold text-[#f5e6d3]">Rules</h2>
-              <button className="btn-luxe-outline rounded px-3 py-1.5 text-xs font-semibold" onClick={() => setShowRulesOverlay(false)} type="button">
+              <div>
+                <span className="modal-badge">Rules</span>
+                <h2 className="heading-elegant mt-2 text-3xl font-bold text-[#fff7ef]">Rules</h2>
+              </div>
+              <button className="modal-action-button modal-action-button--sm modal-action-button--secondary" onClick={() => setShowRulesOverlay(false)} type="button">
                 Close
               </button>
             </div>
-            <p className="max-h-[65vh] overflow-y-auto whitespace-pre-wrap rounded-lg border border-[#f5e6d3]/35 bg-[#5e2a4d]/55 p-4 text-sm text-[#f5e6d3]">
+            <p className="modal-content-card max-h-[65vh] overflow-y-auto whitespace-pre-wrap rounded-lg p-4 text-sm text-[#fff7ef]">
               {game.rulesText}
             </p>
           </section>
-        </div>
+        </ModalOverlay>
       ) : null}
       {showRandomInstructionOverlay && activeRandomInstruction ? (
-        <div
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-[#3a1a30]/82 p-4"
-          role="presentation"
-        >
+        <ModalOverlay zIndex="z-[70]">
           <section
-            className="glass-panel flex max-h-[90vh] w-full max-w-2xl flex-col overflow-y-auto rounded-2xl border border-[#d4af37]/70 p-6 text-center"
+            className="modal-shell flex max-h-[92vh] w-full max-w-xl flex-col overflow-y-auto rounded-lg p-4 text-center"
             onClick={(event) => event.stopPropagation()}
           >
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#d4af37]">Random Instruction</p>
-            <h2 className="heading-elegant mt-2 text-4xl font-bold text-[#f5e6d3]">
+            <span className="modal-badge mx-auto">Random Instruction</span>
+            <h2 className="heading-elegant mt-2 text-2xl font-bold text-[#fff7ef] md:text-3xl">
               {activeRandomInstruction.assignedPlayer === 'P1' || activeRandomInstruction.assignedPlayer === 'P2'
                 ? `${activeRandomInstruction.assignedPlayer}, Do This Now`
                 : 'Do This Now'}
@@ -1418,8 +1549,8 @@ export function GameplayScreen() {
               const targetPlayers: Player[] = isForBoth ? ['P1', 'P2'] : [assigned];
               const caption = isForBoth ? 'This is for you both!' : 'This is for you!';
               return (
-                <div className="mx-auto mt-4 flex w-full max-w-xl flex-col items-center rounded-xl border border-[#d4af37]/70 bg-[#5e2a4d]/60 p-4 text-center">
-                  <div className="flex flex-wrap items-center justify-center gap-4">
+                <div className="modal-content-card mx-auto mt-3 flex w-full max-w-md flex-col items-center rounded-lg p-3 text-center">
+                  <div className="flex flex-wrap items-center justify-center gap-3">
                     {targetPlayers.map((targetPlayer) => {
                       const targetPlayerImage = game.playerImages[targetPlayer];
                       const targetPlayerImageFailed = Boolean(
@@ -1427,7 +1558,7 @@ export function GameplayScreen() {
                       );
                       return targetPlayerImage && !targetPlayerImageFailed ? (
                         <div
-                          className={`relative overflow-hidden rounded-xl border border-[#d4af37]/45 bg-[#2f1530] ${PLAYER_IMAGE_FRAME_SIZE_CLASS}`}
+                          className="relative h-28 w-20 overflow-hidden rounded-lg border border-[#f5e6d3]/16 bg-[#120b17]"
                           key={targetPlayer}
                         >
                           <Image
@@ -1439,13 +1570,13 @@ export function GameplayScreen() {
                                 setFailedImageMap((previous) => ({ ...previous, [targetPlayerImage]: true }));
                               }
                             }}
-                            sizes="176px"
+                            sizes="80px"
                             src={targetPlayerImage}
                           />
                         </div>
                       ) : (
                         <div
-                          className={`flex items-center justify-center rounded-xl border border-[#d4af37]/35 bg-[#2f1530] text-xs text-[#fadadd] ${PLAYER_IMAGE_FRAME_SIZE_CLASS}`}
+                          className="flex h-28 w-20 items-center justify-center rounded-lg border border-[#f5e6d3]/16 bg-[#120b17] px-2 text-center text-[10px] text-[#d9c4c8]"
                           key={targetPlayer}
                         >
                           Add {targetPlayer} image in Dashboard
@@ -1453,7 +1584,7 @@ export function GameplayScreen() {
                       );
                     })}
                   </div>
-                  <p className="mt-3 text-sm font-semibold tracking-wide text-[#f5e6d3]">{caption}</p>
+                  <p className="mt-2 text-xs font-semibold tracking-wide text-[#fff7ef]">{caption}</p>
                 </div>
               );
             })()}
@@ -1483,48 +1614,42 @@ export function GameplayScreen() {
               return (
                 <>
                   {hasSecondStep ? (
-                    <p className="mt-3 text-xs font-semibold uppercase tracking-[0.2em] text-[#fadadd]/80">
+                    <p className="mt-2 text-xs font-bold uppercase tracking-[0.12em] text-[#d9c4c8]">
                       {onStep1 ? 'Step 1 of 2' : 'Step 2 of 2'}
                     </p>
                   ) : null}
                   {viewImage && !viewImageFailed ? (
-                    <div className="relative mx-auto mt-5 h-60 w-full max-w-xl overflow-hidden rounded-xl border border-[#f5e6d3]/35 bg-[#5e2a4d]/55">
+                    <div className="modal-content-card relative mx-auto mt-3 h-40 w-full max-w-md overflow-hidden rounded-lg">
                       <Image
                         alt={onStep2 ? 'Random instruction step 2' : 'Random instruction'}
                         className="object-contain"
                         fill
                         onError={() => setViewImageFailed(true)}
-                        sizes="(max-width: 768px) 100vw, 720px"
+                        sizes="(max-width: 768px) 100vw, 520px"
                         src={viewImage}
                       />
                     </div>
                   ) : null}
-                  <p className="mt-5 whitespace-pre-wrap rounded-xl border border-[#f5e6d3]/35 bg-[#5e2a4d]/55 p-4 text-lg font-semibold text-[#f5e6d3]">
+                  <p className="modal-content-card mt-3 whitespace-pre-wrap rounded-lg p-3 text-base font-semibold text-[#fff7ef]">
                     {viewText || 'Follow the image instruction.'}
                   </p>
                   {viewTimerSeconds ? (
-                    <article
-                      className={`mt-5 rounded-xl border p-4 text-center transition-colors ${
-                        isRandomInstructionTimerFlashing && isRandomInstructionTimerFlashOn
-                          ? 'border-[#f5e6d3] bg-[#f5e6d3] text-[#5e2a4d]'
-                          : 'border-[#d4af37]/70 bg-[#5e2a4d]/65 text-[#f5e6d3]'
-                      }`}
-                    >
-                      <p className="text-sm font-semibold uppercase tracking-wider text-[#d4af37]">Countdown</p>
-                      <p className="mt-3 text-5xl font-black tabular-nums">
+                    <TimerPanel isFlashing={isRandomInstructionTimerFlashing && isRandomInstructionTimerFlashOn}>
+                      <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#f0ca61]">Countdown</p>
+                      <p className="mt-2 text-4xl font-black tabular-nums">
                         {viewTimerUnit === 'minutes'
                           ? `${(randomInstructionSecondsLeft / 60).toFixed(randomInstructionSecondsLeft % 60 === 0 ? 0 : 2)}m`
                           : `${randomInstructionSecondsLeft}s`}
                       </p>
-                      <p className="mt-2 text-sm text-[#fadadd]/90">
+                      <p className="mt-2 text-xs text-[#d9c4c8]">
                         Source:{' '}
                         {viewTimerUnit === 'minutes'
-                          ? `${+(viewTimerSeconds / 60).toFixed(2)} minute${viewTimerSeconds / 60 === 1 ? '' : 's'}`
+                          ? `${viewTimerSeconds} minute${viewTimerSeconds === 1 ? '' : 's'}`
                           : `${viewTimerSeconds} second${viewTimerSeconds === 1 ? '' : 's'}`}
                       </p>
-                      <div className="mt-4">
+                      <div className="mt-3">
                         <button
-                          className="btn-luxe rounded px-5 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                          className="btn-luxe modal-action-button modal-action-button--sm disabled:cursor-not-allowed disabled:opacity-50"
                           disabled={isRandomInstructionTimerRunning || isRandomInstructionTimerFlashing}
                           onClick={startRandomInstructionTimer}
                           type="button"
@@ -1532,12 +1657,12 @@ export function GameplayScreen() {
                           {isRandomInstructionTimerRunning ? 'Running...' : 'Start Timer'}
                         </button>
                       </div>
-                    </article>
+                    </TimerPanel>
                   ) : null}
-                  <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+                  <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
                     {onStep1 ? (
                       <button
-                        className="btn-luxe rounded px-6 py-2 text-sm font-semibold"
+                        className="btn-luxe modal-action-button"
                         onClick={onNextRandomInstructionStep}
                         type="button"
                       >
@@ -1546,7 +1671,7 @@ export function GameplayScreen() {
                     ) : (
                       <>
                         <button
-                          className="btn-luxe rounded px-6 py-2 text-sm font-semibold"
+                          className="btn-luxe modal-action-button"
                           onClick={dismissRandomInstruction}
                           type="button"
                         >
@@ -1554,7 +1679,7 @@ export function GameplayScreen() {
                         </button>
                         {activeRandomInstruction.nopeAlternative ? (
                           <button
-                            className="btn-luxe-outline rounded px-6 py-2 text-sm font-semibold"
+                            className="modal-action-button modal-action-button--secondary"
                             onClick={onNopeRandomInstruction}
                             type="button"
                           >
@@ -1566,7 +1691,7 @@ export function GameplayScreen() {
                   </div>
                   {!onStep1 && activeRandomInstruction.linkUrl ? (
                     <button
-                      className="btn-luxe-outline mt-3 rounded px-6 py-2 text-sm font-semibold"
+                      className="modal-action-button modal-action-button--secondary mt-3"
                       onClick={() => {
                         window.open(activeRandomInstruction.linkUrl ?? '', '_blank', 'noopener,noreferrer');
                         dismissRandomInstruction();
@@ -1580,57 +1705,48 @@ export function GameplayScreen() {
               );
             })()}
           </section>
-        </div>
+        </ModalOverlay>
       ) : null}
       {showNopeTaskOverlay && activeNopeTask ? (
-        <div
-          className="fixed inset-0 z-[68] flex items-center justify-center bg-[#3a1a30]/82 p-4"
-          role="presentation"
-        >
+        <ModalOverlay zIndex="z-[68]">
           <section
-            className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-y-auto rounded-2xl border-2 border-[#d4af37] bg-gradient-to-b from-[#5e2a4d] to-[#3a1a30] p-6 text-center shadow-2xl"
+            className="modal-shell flex max-h-[92vh] w-full max-w-xl flex-col overflow-y-auto rounded-lg p-4 text-center"
             onClick={(event) => event.stopPropagation()}
           >
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#d4af37]">Opted Out</p>
-            <h2 className="heading-elegant mt-2 text-4xl font-bold text-[#f5e6d3]">New Task</h2>
+            <span className="modal-badge mx-auto">Opted Out</span>
+            <h2 className="heading-elegant mt-2 text-2xl font-bold text-[#fff7ef] md:text-3xl">New Task</h2>
             {activeNopeTask.imageRef && !nopeTaskImageFailed ? (
-              <div className="relative mx-auto mt-5 h-60 w-full max-w-xl overflow-hidden rounded-xl border border-[#f5e6d3]/35 bg-[#5e2a4d]/55">
+              <div className="modal-content-card relative mx-auto mt-3 h-40 w-full max-w-md overflow-hidden rounded-lg">
                 <Image
                   alt="Nope replacement task"
                   className="object-contain"
                   fill
                   onError={() => setNopeTaskImageFailed(true)}
-                  sizes="(max-width: 768px) 100vw, 720px"
+                  sizes="(max-width: 768px) 100vw, 520px"
                   src={activeNopeTask.imageRef}
                 />
               </div>
             ) : null}
-            <p className="mt-5 whitespace-pre-wrap rounded-xl border border-[#f5e6d3]/35 bg-[#5e2a4d]/55 p-4 text-lg font-semibold text-[#f5e6d3]">
+            <p className="modal-content-card mt-3 whitespace-pre-wrap rounded-lg p-3 text-base font-semibold text-[#fff7ef]">
               {activeNopeTask.text || 'Follow the image instruction.'}
             </p>
             {activeNopeTask.timerSeconds ? (
-              <article
-                className={`mt-5 rounded-xl border p-4 text-center transition-colors ${
-                  isNopeTimerFlashing && isNopeTimerFlashOn
-                    ? 'border-[#f5e6d3] bg-[#f5e6d3] text-[#5e2a4d]'
-                    : 'border-[#d4af37]/70 bg-[#5e2a4d]/65 text-[#f5e6d3]'
-                }`}
-              >
-                <p className="text-sm font-semibold uppercase tracking-wider text-[#d4af37]">Countdown</p>
-                <p className="mt-3 text-5xl font-black tabular-nums">
+              <TimerPanel isFlashing={isNopeTimerFlashing && isNopeTimerFlashOn}>
+                <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#f0ca61]">Countdown</p>
+                <p className="mt-2 text-4xl font-black tabular-nums">
                   {activeNopeTask.timerUnit === 'minutes'
                     ? `${(nopeSecondsLeft / 60).toFixed(nopeSecondsLeft % 60 === 0 ? 0 : 2)}m`
                     : `${nopeSecondsLeft}s`}
                 </p>
-                <p className="mt-2 text-sm text-[#fadadd]/90">
+                <p className="mt-2 text-xs text-[#d9c4c8]">
                   Source:{' '}
                   {activeNopeTask.timerUnit === 'minutes'
-                    ? `${+(activeNopeTask.timerSeconds / 60).toFixed(2)} minute${activeNopeTask.timerSeconds / 60 === 1 ? '' : 's'}`
+                    ? `${activeNopeTask.timerSeconds} minute${activeNopeTask.timerSeconds === 1 ? '' : 's'}`
                     : `${activeNopeTask.timerSeconds} second${activeNopeTask.timerSeconds === 1 ? '' : 's'}`}
                 </p>
-                <div className="mt-4">
+                <div className="mt-3">
                   <button
-                    className="btn-luxe rounded px-5 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                    className="btn-luxe modal-action-button modal-action-button--sm disabled:cursor-not-allowed disabled:opacity-50"
                     disabled={isNopeTimerRunning || isNopeTimerFlashing}
                     onClick={startNopeTimer}
                     type="button"
@@ -1638,11 +1754,11 @@ export function GameplayScreen() {
                     {isNopeTimerRunning ? 'Running...' : 'Start Timer'}
                   </button>
                 </div>
-              </article>
+              </TimerPanel>
             ) : null}
-            <div className="mt-5 flex justify-center">
+            <div className="mt-4 flex justify-center">
               <button
-                className="btn-luxe rounded px-6 py-2 text-sm font-semibold"
+                className="btn-luxe modal-action-button"
                 onClick={closeNopeTaskOverlay}
                 type="button"
               >
@@ -1650,32 +1766,23 @@ export function GameplayScreen() {
               </button>
             </div>
           </section>
-        </div>
+        </ModalOverlay>
       ) : null}
       {showGameOverOverlay ? (
-        <div
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-[#1a0a1a]/92 p-4"
-          role="presentation"
-        >
+        <ModalOverlay zIndex="z-[80]">
           <section
-            className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-y-auto rounded-2xl border-2 border-[#d4af37] bg-gradient-to-b from-[#5e2a4d] to-[#3a1a30] p-6 text-center shadow-2xl"
+            className="modal-shell flex max-h-[90vh] w-full max-w-2xl flex-col overflow-y-auto rounded-lg p-6 text-center"
             onClick={(event) => event.stopPropagation()}
           >
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#d4af37]">Final Round Complete</p>
-            <h2 className="heading-elegant mt-2 text-4xl font-bold text-[#f5e6d3]">Game Over...or is it?</h2>
-            <p className="mt-2 text-sm text-[#fadadd]/80">The night isn&apos;t over just yet — one last challenge awaits.</p>
-            <div className="mt-6 rounded-xl border border-[#d4af37]/70 bg-[#5e2a4d]/60 p-5">
-              <p className="text-xs font-semibold uppercase tracking-wider text-[#d4af37]">Your Final Act</p>
-              <p className="mt-4 whitespace-pre-wrap text-xl font-bold text-[#f5e6d3]">{gameOverAction}</p>
+            <span className="modal-badge mx-auto">Final Round Complete</span>
+            <h2 className="heading-elegant mt-3 text-3xl font-bold text-[#fff7ef] md:text-4xl">Game Over...or is it?</h2>
+            <p className="mt-2 text-sm text-[#d9c4c8]">The night isn&apos;t over just yet - one last challenge awaits.</p>
+            <div className="modal-content-card mt-6 rounded-lg p-5">
+              <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#f0ca61]">Your Final Act</p>
+              <p className="mt-4 whitespace-pre-wrap text-xl font-bold text-[#fff7ef]">{gameOverAction}</p>
             </div>
-            <article
-              className={`mt-5 rounded-xl border p-4 text-center transition-colors ${
-                isGameOverTimerFlashing && isGameOverTimerFlashOn
-                  ? 'border-[#f5e6d3] bg-[#f5e6d3] text-[#5e2a4d]'
-                  : 'border-[#d4af37]/70 bg-[#5e2a4d]/65 text-[#f5e6d3]'
-              }`}
-            >
-              <p className="text-sm font-semibold uppercase tracking-wider text-[#d4af37]">Countdown</p>
+            <TimerPanel isFlashing={isGameOverTimerFlashing && isGameOverTimerFlashOn}>
+              <p className="text-sm font-bold uppercase tracking-[0.08em] text-[#f0ca61]">Countdown</p>
               <p className="mt-3 text-5xl font-black tabular-nums">
                 {gameOverTimerUnit === 'minutes'
                   ? `${(gameOverSecondsLeft / 60).toFixed(gameOverSecondsLeft % 60 === 0 ? 0 : 2)}m`
@@ -1683,7 +1790,7 @@ export function GameplayScreen() {
               </p>
               <div className="mt-4">
                 <button
-                  className="btn-luxe rounded px-5 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                  className="btn-luxe modal-action-button modal-action-button--sm disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={isGameOverTimerRunning || isGameOverTimerFlashing}
                   onClick={startGameOverTimer}
                   type="button"
@@ -1691,10 +1798,10 @@ export function GameplayScreen() {
                   {isGameOverTimerRunning ? 'Running...' : 'Start Timer'}
                 </button>
               </div>
-            </article>
+            </TimerPanel>
             <div className="mt-6 flex justify-center">
               <button
-                className="btn-luxe rounded px-8 py-2.5 text-sm font-semibold"
+                className="btn-luxe modal-action-button"
                 onClick={closeGameOverOverlay}
                 type="button"
               >
@@ -1702,21 +1809,18 @@ export function GameplayScreen() {
               </button>
             </div>
           </section>
-        </div>
+        </ModalOverlay>
       ) : null}
       {showRoundIntroOverlay && activeRoundIntro ? (
-        <div
-          className="fixed inset-0 z-[72] flex items-center justify-center bg-[#3a1a30]/82 p-4"
-          role="presentation"
-        >
+        <ModalOverlay zIndex="z-[72]">
           <section
-            className="glass-panel w-full max-w-2xl rounded-2xl border border-[#d4af37]/70 p-6 text-center"
+            className="modal-shell w-full max-w-2xl rounded-lg p-6 text-center"
             onClick={(event) => event.stopPropagation()}
           >
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#d4af37]">Round Transition</p>
-            <h2 className="heading-elegant mt-2 text-4xl font-bold text-[#f5e6d3]">Welcome to {activeRoundIntro.name}</h2>
+            <span className="modal-badge mx-auto">Round Transition</span>
+            <h2 className="heading-elegant mt-3 text-3xl font-bold text-[#fff7ef] md:text-4xl">Welcome to {activeRoundIntro.name}</h2>
             {activeRoundIntroImageRef && !failedImageMap[activeRoundIntroImageRef] ? (
-              <div className="relative mx-auto mt-5 h-60 w-full max-w-xl overflow-hidden rounded-xl border border-[#f5e6d3]/35 bg-[#5e2a4d]/55">
+              <div className="modal-content-card relative mx-auto mt-5 h-60 w-full max-w-xl overflow-hidden rounded-lg">
                 <Image
                   alt={`${activeRoundIntro.name} intro`}
                   className="object-contain"
@@ -1731,11 +1835,11 @@ export function GameplayScreen() {
                 />
               </div>
             ) : null}
-            <p className="mt-5 rounded-xl border border-[#f5e6d3]/35 bg-[#5e2a4d]/55 p-4 text-lg font-semibold text-[#f5e6d3]">
+            <p className="modal-content-card mt-5 rounded-lg p-4 text-lg font-semibold text-[#fff7ef]">
               {activeRoundIntro.introText}
             </p>
             <button
-              className="btn-luxe mt-5 rounded px-6 py-2 text-sm font-semibold"
+              className="btn-luxe modal-action-button mt-5"
               onClick={() => {
                 setShowRoundIntroOverlay(false);
                 setActiveRoundIntro(null);
@@ -1745,7 +1849,7 @@ export function GameplayScreen() {
               Let&apos;s Play
             </button>
           </section>
-        </div>
+        </ModalOverlay>
       ) : null}
     </main>
   );

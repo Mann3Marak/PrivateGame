@@ -134,7 +134,7 @@ export const RANDOM_ACTION_COUNTS: readonly number[] = [4, 3, 3, 3, 0] as const;
 // Total turns per round. When set, the round ends after this many combined turns across
 // both players (player order still alternates strictly). When quotaPerPlayer x 2 equals
 // this value the two end conditions coincide; otherwise totalTurns wins.
-export const ROUND_TOTAL_TURNS: readonly number[] = [10, 3, 10, 3, 2] as const;
+export const ROUND_TOTAL_TURNS: readonly number[] = [10, 3, 10, 3, 4] as const;
 
 export function roundModeForRound(roundNumber: number): RoundMode {
   const mode = ROUND_MODES[roundNumber - 1];

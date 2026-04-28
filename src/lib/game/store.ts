@@ -25,7 +25,7 @@ import { createDefaultGameState } from './default-state';
 import { executeSpin } from './engine';
 import { HydrationResult, loadPersistedState, persistState, validateGameState } from './persistence';
 import { queueSpinTelemetryEvent } from './telemetry';
-import { GameState, Player, RandomActionAssignedPlayer, SpinOutcome, SpinnerType } from './types';
+import { GameState, Player, RandomActionAssignedPlayer, SpinOutcome, SpinnerType, totalTurnsForRound } from './types';
 
 const SAVE_DEBOUNCE_MS = 300;
 
@@ -42,6 +42,8 @@ export interface GameStoreState {
   resume: () => void;
   spin: (player: Player) => SpinOutcome;
   advanceActionTurn: (player: Player) => void;
+  forceAdvanceToNextRound: () => void;
+  switchActivePlayer: () => void;
   restartGame: () => void;
   clearDashboardError: () => void;
   updateRulesText: (rulesText: string) => boolean;
@@ -263,7 +265,7 @@ export const useGameStore = create<GameStoreState>((set, get) => {
 
       const counters = cloned.session.turnCounters[key];
       const totalTurnsTaken = counters.P1 + counters.P2;
-      const totalLimit = round.totalTurns > 0 ? round.totalTurns : round.quotaPerPlayer * 2;
+      const totalLimit = totalTurnsForRound(round.roundNumber);
       const quotaMet = totalTurnsTaken >= totalLimit;
       let roundAdvanced = false;
       if (quotaMet) {
@@ -281,6 +283,28 @@ export const useGameStore = create<GameStoreState>((set, get) => {
       }
 
       cloned.session.activePlayer = roundAdvanced ? 'P1' : player === 'P1' ? 'P2' : 'P1';
+      cloned.session.updatedAt = new Date().toISOString();
+      commit(cloned, null);
+    },
+    forceAdvanceToNextRound: () => {
+      const cloned = cloneGame(get().game);
+      const currentIndex = cloned.rounds.findIndex((r) => r.roundNumber === cloned.session.currentRoundNumber);
+      if (currentIndex < 0 || currentIndex >= cloned.rounds.length - 1) {
+        return;
+      }
+      const nextRound = cloned.rounds[currentIndex + 1];
+      cloned.session.currentRoundNumber = nextRound.roundNumber;
+      const nextKey = String(nextRound.roundNumber);
+      if (!cloned.session.turnCounters[nextKey]) {
+        cloned.session.turnCounters[nextKey] = { P1: 0, P2: 0 };
+      }
+      cloned.session.activePlayer = 'P1';
+      cloned.session.updatedAt = new Date().toISOString();
+      commit(cloned, null);
+    },
+    switchActivePlayer: () => {
+      const cloned = cloneGame(get().game);
+      cloned.session.activePlayer = cloned.session.activePlayer === 'P1' ? 'P2' : 'P1';
       cloned.session.updatedAt = new Date().toISOString();
       commit(cloned, null);
     },
