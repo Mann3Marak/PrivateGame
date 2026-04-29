@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useGameStore } from '@/src/lib/game/store';
 import { MAX_ROUNDS, Player, RandomAction, Round, SpinnerType } from '@/src/lib/game/types';
 import { isValidAudioUrl, isValidSpinnerImageUrl, isValidYouTubeUrl } from '@/src/lib/game/config';
+import { clearLocalVideo, loadLocalVideo, saveLocalVideo } from '@/src/lib/game/local-video-store';
 import { PAGE_CONTAINER_CLASS } from '@/src/lib/ui/layout';
 import {
   NopeTaskModalPreview,
@@ -986,6 +987,8 @@ export function DashboardShell() {
   const updateResultInfoText = useGameStore((state) => state.updateResultInfoText);
   const updateGameOverChallenge = useGameStore((state) => state.updateGameOverChallenge);
   const updateSideVideoUrl = useGameStore((state) => state.updateSideVideoUrl);
+  const localVideoObjectUrl = useGameStore((state) => state.localVideoObjectUrl);
+  const setLocalVideoObjectUrl = useGameStore((state) => state.setLocalVideoObjectUrl);
   const updateAudioMuted = useGameStore((state) => state.updateAudioMuted);
   const updateAudioVolume = useGameStore((state) => state.updateAudioVolume);
   const updateRoundName = useGameStore((state) => state.updateRoundName);
@@ -1016,6 +1019,7 @@ export function DashboardShell() {
   const [newUploadBusy, setNewUploadBusy] = useState(false);
   const [newUploadError, setNewUploadError] = useState<string | null>(null);
   const newEntryFileInputRef = useRef<HTMLInputElement | null>(null);
+  const localVideoFileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     void hydrateFromCloud();
@@ -1038,6 +1042,16 @@ export function DashboardShell() {
   useEffect(() => {
     setSideVideoUrlDraft(game.sideVideoUrl ?? '');
   }, [game.sideVideoUrl]);
+
+  useEffect(() => {
+    if (localVideoObjectUrl) return;
+    void loadLocalVideo().then((file) => {
+      if (file) {
+        setLocalVideoObjectUrl(URL.createObjectURL(file));
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     setAudioVolumeDraft(String(Math.round(game.audioSettings.volume * 100)));
@@ -1359,32 +1373,81 @@ export function DashboardShell() {
                 <p className="mt-1 text-right text-xs text-slate-500">{resultInfoDraft.length}/280</p>
               </div>
               <div className="mt-4 rounded border border-dashed p-3">
-                <h3 className="text-sm font-semibold">Side YouTube Video</h3>
+                <h3 className="text-sm font-semibold">Side Video</h3>
                 <p className="mt-1 text-xs text-slate-600">
-                  This video appears in gameplay as a small side card.
+                  This video appears in gameplay as a small side card. Use a YouTube link or pick a local file.
                 </p>
-                <div className="mt-2 grid gap-2 md:grid-cols-[1fr_auto] md:items-end">
-                  <label className="text-sm">
-                    YouTube Link
-                    <input
-                      className="mt-1 w-full rounded border px-2 py-1 text-sm"
-                      onChange={(event) => setSideVideoUrlDraft(event.target.value)}
-                      placeholder="https://www.youtube.com/watch?v=..."
-                      type="url"
-                      value={sideVideoUrlDraft}
-                    />
-                  </label>
-                  <button
-                    className="btn-luxe rounded px-3 py-2 text-sm font-semibold"
-                    onClick={() => updateSideVideoUrl(sideVideoUrlDraft || null)}
-                    type="button"
-                  >
-                    Save Video
-                  </button>
+                <div className="mt-3">
+                  <p className="text-xs font-medium text-slate-700">Option 1 — YouTube Link</p>
+                  <div className="mt-1 grid gap-2 md:grid-cols-[1fr_auto] md:items-end">
+                    <label className="text-sm">
+                      <input
+                        className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                        onChange={(event) => setSideVideoUrlDraft(event.target.value)}
+                        placeholder="https://www.youtube.com/watch?v=..."
+                        type="url"
+                        value={sideVideoUrlDraft}
+                      />
+                    </label>
+                    <button
+                      className="btn-luxe rounded px-3 py-2 text-sm font-semibold"
+                      onClick={() => updateSideVideoUrl(sideVideoUrlDraft || null)}
+                      type="button"
+                    >
+                      Save
+                    </button>
+                  </div>
+                  {sideVideoUrlDraft && !isValidYouTubeUrl(sideVideoUrlDraft) ? (
+                    <p className="mt-1 text-xs text-amber-700">Please use a valid YouTube URL (`youtube.com` or `youtu.be`).</p>
+                  ) : null}
                 </div>
-                {sideVideoUrlDraft && !isValidYouTubeUrl(sideVideoUrlDraft) ? (
-                  <p className="mt-2 text-xs text-amber-700">Please use a valid YouTube URL (`youtube.com` or `youtu.be`).</p>
-                ) : null}
+                <div className="mt-3">
+                  <p className="text-xs font-medium text-slate-700">Option 2 — Local File (this session only)</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <input
+                      accept="video/*"
+                      className="hidden"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (!file) return;
+                        const prev = localVideoObjectUrl;
+                        const next = URL.createObjectURL(file);
+                        setLocalVideoObjectUrl(next);
+                        if (prev) URL.revokeObjectURL(prev);
+                        void saveLocalVideo(file);
+                        event.target.value = '';
+                      }}
+                      ref={localVideoFileInputRef}
+                      type="file"
+                    />
+                    <button
+                      className="btn-luxe rounded px-3 py-2 text-sm font-semibold"
+                      onClick={() => localVideoFileInputRef.current?.click()}
+                      type="button"
+                    >
+                      {localVideoObjectUrl ? 'Change File' : 'Choose File'}
+                    </button>
+                    {localVideoObjectUrl ? (
+                      <button
+                        className="rounded border px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+                        onClick={() => {
+                          URL.revokeObjectURL(localVideoObjectUrl);
+                          setLocalVideoObjectUrl(null);
+                          void clearLocalVideo();
+                        }}
+                        type="button"
+                      >
+                        Clear
+                      </button>
+                    ) : null}
+                    {localVideoObjectUrl ? (
+                      <span className="text-xs text-green-700">Local file loaded</span>
+                    ) : (
+                      <span className="text-xs text-slate-500">No local file selected</span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs text-slate-400">Local file is not saved — you will need to re-select it after a page refresh.</p>
+                </div>
               </div>
               <div className="mt-4 rounded border border-dashed p-3">
                 <h3 className="text-sm font-semibold">Player Turn Images</h3>

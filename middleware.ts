@@ -8,6 +8,7 @@ function buildCspHeader(isDev: boolean): string {
     scriptSrc,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https:",
+    "media-src 'self' blob:",
     "font-src 'self' data:",
     "connect-src 'self' https://*.supabase.co",
     "frame-src 'self' https://www.youtube.com https://youtube.com https://m.youtube.com https://music.youtube.com https://www.youtube-nocookie.com",

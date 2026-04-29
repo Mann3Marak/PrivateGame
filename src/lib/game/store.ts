@@ -37,6 +37,8 @@ export interface GameStoreState {
   recoveryNotice: string | null;
   spinError: string | null;
   dashboardError: string | null;
+  localVideoObjectUrl: string | null;
+  setLocalVideoObjectUrl: (url: string | null) => void;
   hydrateFromCloud: () => Promise<void>;
   pause: () => void;
   resume: () => void;
@@ -181,6 +183,8 @@ export const useGameStore = create<GameStoreState>((set, get) => {
     recoveryNotice: hydrated.recoveryReason,
     spinError: null,
     dashboardError: null,
+    localVideoObjectUrl: null,
+    setLocalVideoObjectUrl: (url) => set({ localVideoObjectUrl: url }),
     hydrateFromCloud: async () => {
       if (cloudHydrated || cloudHydrationInFlight) {
         return;

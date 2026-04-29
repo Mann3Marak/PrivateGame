@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useGameStore } from '@/src/lib/game/store';
 import { NopeAlternative, Player, RandomAction, Round, SpinResultItem } from '@/src/lib/game/types';
 import { PAGE_CONTAINER_CLASS } from '@/src/lib/ui/layout';
+import { loadLocalVideo } from '@/src/lib/game/local-video-store';
 
 const DEFAULT_OVERLAY_TIMER_SECONDS = 10;
 const TIMER_FLASH_INTERVAL_MS = 420;
@@ -371,6 +372,18 @@ export function GameplayScreen() {
   const restartGame = useGameStore((state) => state.restartGame);
   const pause = useGameStore((state) => state.pause);
   const resume = useGameStore((state) => state.resume);
+  const localVideoObjectUrl = useGameStore((state) => state.localVideoObjectUrl);
+  const setLocalVideoObjectUrl = useGameStore((state) => state.setLocalVideoObjectUrl);
+
+  useEffect(() => {
+    if (localVideoObjectUrl) return;
+    void loadLocalVideo().then((file) => {
+      if (file) {
+        setLocalVideoObjectUrl(URL.createObjectURL(file));
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const currentRound = game.rounds.find((round) => round.roundNumber === game.session.currentRoundNumber) ?? game.rounds[0];
   const isLastRound = game.session.currentRoundNumber === game.rounds[game.rounds.length - 1]?.roundNumber;
@@ -1395,7 +1408,16 @@ export function GameplayScreen() {
               Side Video
             </h2>
             <div className="slot-window slot-window--idle mt-3 h-56 overflow-hidden rounded-lg border border-[#f05c9b]/35 xl:h-[clamp(220px,26vw,380px)]">
-              {sideVideoEmbedUrl ? (
+              {localVideoObjectUrl ? (
+                <video
+                  autoPlay
+                  className="h-full w-full object-contain"
+                  controls
+                  loop
+                  muted
+                  src={localVideoObjectUrl}
+                />
+              ) : sideVideoEmbedUrl ? (
                 <iframe
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                   allowFullScreen
@@ -1405,10 +1427,10 @@ export function GameplayScreen() {
                   title="YouTube side video"
                 />
               ) : (
-                <div className="flex h-full items-center justify-center text-xs text-[#d9c4c8]">No YouTube video set</div>
+                <div className="flex h-full items-center justify-center text-xs text-[#d9c4c8]">No video set</div>
               )}
             </div>
-            {game.sideVideoUrl ? (
+            {!localVideoObjectUrl && game.sideVideoUrl ? (
               <a className="mt-3 inline-block text-xs font-semibold text-[#f0ca61] underline" href={game.sideVideoUrl} rel="noreferrer noopener" target="_blank">
                 If blocked, open video in YouTube
               </a>
